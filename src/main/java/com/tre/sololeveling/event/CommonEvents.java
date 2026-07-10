@@ -5,6 +5,7 @@ import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.gameplay.AbilityHandler;
 import com.tre.sololeveling.gameplay.PassiveHandler;
+import com.tre.sololeveling.gameplay.ProgressionChoiceHandler;
 import com.tre.sololeveling.gameplay.ProgressionHandler;
 import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ShadowHandler;
@@ -36,6 +37,7 @@ public final class CommonEvents {
     public void playerTick(TickEvent.PlayerTickEvent event) {
         if (event.phase != TickEvent.Phase.END || event.side != LogicalSide.SERVER || !(event.player instanceof ServerPlayer player)) return;
         HunterData.tick(player);
+        ProgressionChoiceHandler.tick(player);
         AbilityHandler.tick(player);
         PassiveHandler.tick(player);
         QuestHandler.tick(player);
