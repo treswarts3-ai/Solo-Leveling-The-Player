@@ -39,6 +39,7 @@ public final class ServerActionHandler {
             if (cooldownBefore == 0L && HunterData.cooldownRemaining(player, skill) > 0L) {
                 QuestApi.onAbilityUsed(player, skill);
                 QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
+                QuestHandler.onAbilityUse(player);
             }
             return;
         }
@@ -51,6 +52,7 @@ public final class ServerActionHandler {
             if (cooldownBefore == 0L && HunterData.cooldownRemaining(player, cooldownKey) > 0L) {
                 QuestApi.onAbilityUsed(player, "rulers_authority");
                 QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
+                QuestHandler.onAbilityUse(player);
             }
             return;
         }
