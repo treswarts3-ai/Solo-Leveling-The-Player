@@ -1,0 +1,24 @@
+name: Cleanup Migration Branches
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cleanup-migration-branches.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove temporary branches
+        shell: bash
+        run: |
+          git push origin --delete migration/import-organized-source || true
+          git push origin --delete temp-check-do-not-use || true
