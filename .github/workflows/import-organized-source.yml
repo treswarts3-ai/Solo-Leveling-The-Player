@@ -9,10 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  import-and-verify:
+  diagnose-archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-
     steps:
       - name: Checkout migration branch
         uses: actions/checkout@v4
@@ -20,66 +18,27 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Set up Gradle 8.8
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.8'
-
-      - name: Reconstruct verified source archive
+      - name: Diagnose staged archive
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           cat .migration/chunk*.b64 | tr -d '\n\r' | base64 --decode > /tmp/solo-migration-min.tar.gz
-          echo '95c469f9eeae7da50d8f54d0975f76f205257f8872c20e4e0188069e6e6faa44  /tmp/solo-migration-min.tar.gz' | sha256sum --check --strict
-          mkdir -p /tmp/solo-source
-          tar -xzf /tmp/solo-migration-min.tar.gz -C /tmp/solo-source
-          test -f /tmp/solo-source/solo-migration-min/build.gradle
-          test -f /tmp/solo-source/solo-migration-min/src/main/java/com/tre/sololeveling/SoloLevelingMod.java
-
-      - name: Install organized project tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          rsync -a /tmp/solo-source/solo-migration-min/ ./
-          rm -rf .migration
-          rm -f .github/workflows/import-organized-source.yml
-
-      - name: Regenerate project assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m pip install --disable-pip-version-check pillow
-          python tools/generate_assets.py
-          if [ -f ASSET_MANIFEST.md ]; then
-            mkdir -p docs
-            mv ASSET_MANIFEST.md docs/ASSET_MANIFEST.md
-          fi
-
-      - name: Restore Gradle wrapper
-        shell: bash
-        run: |
-          set -euo pipefail
-          gradle wrapper --gradle-version 8.8
-          chmod +x gradlew
-          test -f gradle/wrapper/gradle-wrapper.jar
-
-      - name: Build and verify Forge mod
-        shell: bash
-        run: ./gradlew clean build --stacktrace --no-daemon
-
-      - name: Commit verified organized source to migration branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf build .gradle run out
+          decode_status=$?
+          actual_sha=$(sha256sum /tmp/solo-migration-min.tar.gz | awk '{print $1}')
+          actual_size=$(wc -c < /tmp/solo-migration-min.tar.gz)
+          tar -tzf /tmp/solo-migration-min.tar.gz > /tmp/tar-list.txt 2> /tmp/tar-error.txt
+          tar_status=$?
+          {
+            echo "decode_status=${decode_status}"
+            echo "actual_sha=${actual_sha}"
+            echo "expected_sha=95c469f9eeae7da50d8f54d0975f76f205257f8872c20e4e0188069e6e6faa44"
+            echo "actual_size=${actual_size}"
+            echo "tar_status=${tar_status}"
+            echo "tar_error=$(tr '\n' ' ' < /tmp/tar-error.txt)"
+            echo "first_entry=$(head -n 1 /tmp/tar-list.txt)"
+          } > .migration/diagnostic.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'Import verified organized Solo Leveling source'
+          git add .migration/diagnostic.txt
+          git commit -m 'Record migration archive diagnostics'
           git push origin "HEAD:${GITHUB_HEAD_REF}"
