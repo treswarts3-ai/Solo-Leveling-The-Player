@@ -1,6 +1,7 @@
 package com.tre.sololeveling.dungeon;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.DifficultyInstance;
@@ -25,18 +26,20 @@ import java.util.UUID;
 public final class DungeonEnemies {
     private static final String TAG_COLLECTION_CARRIER = "sl_collection_carrier";
     private static final int[][] SPAWN_OFFSETS = {
-            {-7, -3}, {7, -3}, {-7, 3}, {7, 3}, {0, -6}, {0, 6},
-            {-4, 0}, {4, 0}, {-10, 0}, {10, 0}, {-3, 6}, {3, 6},
-            {-3, -6}, {3, -6}, {-11, 4}, {11, 4}
+            {-6, -3}, {6, -3}, {-6, 3}, {6, 3}, {0, -5}, {0, 5},
+            {-4, 0}, {4, 0}, {-8, 0}, {8, 0}, {-3, 4}, {3, 4},
+            {-3, -4}, {3, -4}, {-7, 4}, {7, 4}
     };
 
     public static int spawnWave(ServerLevel level, DungeonSession session, DungeonTypes.WaveDefinition wave, DungeonTypes.GateRank rank) {
-        if (wave == null || session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return 0;
+        if (wave == null || session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES
+                || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return 0;
         int spawned = 0;
         int sequence = 0;
         for (DungeonTypes.SpawnEntry entry : wave.entries()) {
             for (int i = 0; i < entry.count(); i++) {
-                if (session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return spawned;
+                if (session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES
+                        || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return spawned;
                 BlockPos position = spawnPosition(session, sequence++);
                 LivingEntity entity = spawn(level, session, entry.enemyId(), position, rank, wave.collectionDrops());
                 if (entity != null) spawned++;
@@ -48,11 +51,14 @@ public final class DungeonEnemies {
     public static LivingEntity spawn(ServerLevel level, DungeonSession session, String enemyId, BlockPos position,
                                       DungeonTypes.GateRank rank, boolean collectionCarrier) {
         DungeonTypes.EnemyDefinition definition = DungeonContent.enemy(enemyId);
-        if (definition == null || session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return null;
+        if (definition == null || session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES
+                || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return null;
         Mob mob = create(level, definition);
         if (mob == null) return null;
-        BlockPos safe = findSafeSpawn(level, position);
-        mob.moveTo(safe.getX() + 0.5D, safe.getY(), safe.getZ() + 0.5D, level.getRandom().nextFloat() * 360.0F, 0.0F);
+        BlockPos safe = findSafeSpawn(level, mob, position);
+        if (safe == null) return null;
+        mob.moveTo(safe.getX() + 0.5D, safe.getY(), safe.getZ() + 0.5D,
+                level.getRandom().nextFloat() * 360.0F, 0.0F);
         DifficultyInstance difficulty = level.getCurrentDifficultyAt(safe);
         mob.finalizeSpawn(level, difficulty, MobSpawnType.COMMAND, null, null);
         configure(mob, definition, rank);
@@ -73,7 +79,8 @@ public final class DungeonEnemies {
     }
 
     public static UUID sessionId(LivingEntity entity) {
-        return entity.getPersistentData().hasUUID(DungeonTypes.TAG_SESSION) ? entity.getPersistentData().getUUID(DungeonTypes.TAG_SESSION) : null;
+        return entity.getPersistentData().hasUUID(DungeonTypes.TAG_SESSION)
+                ? entity.getPersistentData().getUUID(DungeonTypes.TAG_SESSION) : null;
     }
 
     public static String enemyId(LivingEntity entity) {
@@ -88,7 +95,8 @@ public final class DungeonEnemies {
         if (!entity.getPersistentData().getBoolean(TAG_COLLECTION_CARRIER)) return;
         UUID sessionId = sessionId(entity);
         if (sessionId == null) return;
-        ItemEntity token = new ItemEntity(level, entity.getX(), entity.getY() + 0.25D, entity.getZ(), new ItemStack(Items.AMETHYST_SHARD));
+        ItemEntity token = new ItemEntity(level, entity.getX(), entity.getY() + 0.25D, entity.getZ(),
+                new ItemStack(Items.AMETHYST_SHARD));
         token.setCustomName(Component.literal("Mana Crystal"));
         token.setCustomNameVisible(true);
         token.setPickUpDelay(32767);
@@ -134,25 +142,28 @@ public final class DungeonEnemies {
         BlockPos center = DungeonArena.encounterCenter(session);
         int[] offset = SPAWN_OFFSETS[index % SPAWN_OFFSETS.length];
         int ring = index / SPAWN_OFFSETS.length;
-        return center.offset(offset[0] + (ring % 2 == 0 ? ring : -ring), 0, offset[1] + ring);
+        int x = offset[0] + (ring % 2 == 0 ? ring : -ring);
+        int z = offset[1] + (ring % 3) - 1;
+        return center.offset(x, 0, z);
     }
 
-    private static BlockPos findSafeSpawn(ServerLevel level, BlockPos preferred) {
-        for (int dy = 2; dy >= -2; dy--) {
-            BlockPos feet = preferred.offset(0, dy, 0);
-            if (level.getBlockState(feet).isAir() && level.getBlockState(feet.above()).isAir()
-                    && !level.getBlockState(feet.below()).isAir()) return feet;
-        }
-        for (int radius = 1; radius <= 4; radius++) {
+    private static BlockPos findSafeSpawn(ServerLevel level, Mob mob, BlockPos preferred) {
+        for (int radius = 0; radius <= 6; radius++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
-                    BlockPos feet = preferred.offset(dx, 0, dz);
-                    if (level.getBlockState(feet).isAir() && level.getBlockState(feet.above()).isAir()
-                            && !level.getBlockState(feet.below()).isAir()) return feet;
+                    if (radius > 0 && Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+                    for (int dy = 2; dy >= -3; dy--) {
+                        BlockPos feet = preferred.offset(dx, dy, dz);
+                        if (!level.getWorldBorder().isWithinBounds(feet)) continue;
+                        BlockPos floor = feet.below();
+                        if (!level.getBlockState(floor).isFaceSturdy(level, floor, Direction.UP)) continue;
+                        mob.moveTo(feet.getX() + 0.5D, feet.getY(), feet.getZ() + 0.5D, 0.0F, 0.0F);
+                        if (level.noCollision(mob) && !level.containsAnyLiquid(mob.getBoundingBox())) return feet.immutable();
+                    }
                 }
             }
         }
-        return preferred;
+        return null;
     }
 
     private static String displayName(String id) {
