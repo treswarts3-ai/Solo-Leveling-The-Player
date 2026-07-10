@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin main feature/quests
+          git fetch origin main feature/quests worker5-transfer
           git checkout -B feature/quests origin/feature/quests
           git config user.name "Worker 5 Quest Bot"
           git config user.email "worker5-quests@users.noreply.github.com"
@@ -65,7 +65,18 @@ jobs:
           git add src/main/java
           git commit -m "Add reusable quest framework"
           chmod +x gradlew
-          ./gradlew clean build --stacktrace --no-daemon
+          set +e
+          ./gradlew clean build --stacktrace --no-daemon 2>&1 | tee /tmp/framework-build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            git checkout -B worker5-transfer origin/worker5-transfer
+            cp /tmp/framework-build.log worker5-transfer/framework-build.log
+            git add worker5-transfer/framework-build.log
+            git commit -m "Record Worker 5 framework build failure" || true
+            git push origin HEAD:worker5-transfer
+            exit "$status"
+          fi
 
       - name: Apply and build quest content
         shell: bash
