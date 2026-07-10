@@ -3,6 +3,7 @@ package com.tre.sololeveling.gameplay.ability;
 import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.registry.ModSounds;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
@@ -40,7 +41,8 @@ public final class AbilityService {
         }
         if (!HunterData.cooldownReady(player, definition.id())) {
             double seconds = HunterData.cooldownRemaining(player, definition.id()) / 20.0D;
-            failure(player, definition.displayName() + " is on cooldown for " + String.format(java.util.Locale.ROOT, "%.1f", seconds) + "s.");
+            failure(player, definition.displayName() + " is on cooldown for "
+                    + String.format(java.util.Locale.ROOT, "%.1f", seconds) + "s.");
             return false;
         }
 
@@ -62,17 +64,32 @@ public final class AbilityService {
 
         if (result == null || !result.success()) {
             if (manaCost > 0) HunterData.addMana(player, manaCost);
-            failure(player, result == null || result.feedback().isBlank() ? "No valid target or requirement was met." : result.feedback());
+            failure(player, result == null || result.feedback().isBlank()
+                    ? "No valid target or requirement was met."
+                    : result.feedback());
             HunterData.sync(player);
             return false;
+        }
+
+        if (HunterData.isStealthed(player) && !"stealth".equals(definition.id())) {
+            HunterData.endStealth(player);
+            AbilityEffects.particles(player.serverLevel(), player.position().add(0, 1, 0),
+                    ParticleTypes.SMOKE, 16, 0.4D);
+            player.displayClientMessage(Component.literal("[STEALTH BROKEN: ABILITY USED]")
+                    .withStyle(ChatFormatting.GRAY), true);
         }
 
         int cooldown = Math.max(0, ability.cooldownTicks(player));
         HunterData.setCooldown(player, definition.id(), cooldown);
         AbilityEffects.activationBurst(player);
         if (!result.feedback().isBlank()) {
-            player.sendSystemMessage(Component.literal("[" + definition.displayName().toUpperCase(java.util.Locale.ROOT) + "] " + result.feedback())
-                    .withStyle(ChatFormatting.AQUA));
+            player.sendSystemMessage(Component.literal("[" + definition.displayName().toUpperCase(java.util.Locale.ROOT)
+                    + "] " + result.feedback()).withStyle(ChatFormatting.AQUA));
+        }
+        if (cooldown > 0) {
+            player.displayClientMessage(Component.literal(definition.displayName() + " • "
+                    + String.format(java.util.Locale.ROOT, "%.1fs cooldown", cooldown / 20.0D))
+                    .withStyle(ChatFormatting.DARK_AQUA), true);
         }
         AbilityIntegrationHooks.notifyActivated(player, definition);
         HunterData.sync(player);
@@ -85,6 +102,7 @@ public final class AbilityService {
 
     public static void cancel(ServerPlayer player) {
         for (Ability ability : REGISTRY.all()) ability.cancel(player);
+        if (HunterData.isStealthed(player)) HunterData.endStealth(player);
     }
 
     public static Collection<String> ids() {
@@ -110,7 +128,8 @@ public final class AbilityService {
 
     private static void failure(ServerPlayer player, String feedback) {
         if (player == null) return;
-        player.level().playSound(null, player.blockPosition(), ModSounds.MANA_FAIL.get(), SoundSource.PLAYERS, 0.55F, 1.0F);
+        player.level().playSound(null, player.blockPosition(), ModSounds.MANA_FAIL.get(),
+                SoundSource.PLAYERS, 0.55F, 1.0F);
         player.sendSystemMessage(Component.literal("[SYSTEM] " + feedback).withStyle(ChatFormatting.RED));
     }
 

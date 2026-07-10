@@ -69,6 +69,16 @@ public final class ShadowAiService {
         shadow.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 40, 0, false, false));
         if (shadow.level() != owner.level()) return;
 
+        if (HunterData.domainActive(owner)) {
+            shadow.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 30, 0, false, false));
+            shadow.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 30, 0, false, false));
+            if (owner.tickCount % 20 == 0) {
+                owner.serverLevel().sendParticles(ParticleTypes.REVERSE_PORTAL,
+                        shadow.getX(), shadow.getY() + shadow.getBbHeight() * 0.55D, shadow.getZ(),
+                        5, 0.25D, 0.35D, 0.25D, 0.02D);
+            }
+        }
+
         LivingEntity current = shadow.getTarget();
         if (!validTarget(owner, current)) shadow.setTarget(null);
         LivingEntity desired = desiredTarget(owner, shadow, mode);
@@ -80,7 +90,7 @@ public final class ShadowAiService {
             teleportNearOwner(owner, shadow);
         } else if (distance > followDistance(mode) * followDistance(mode)
                 && (shadow.getTarget() == null || mode != Mode.AGGRESSIVE)) {
-            shadow.getNavigation().moveTo(owner, 1.15D);
+            shadow.getNavigation().moveTo(owner, HunterData.domainActive(owner) ? 1.25D : 1.15D);
         }
     }
 
@@ -101,7 +111,9 @@ public final class ShadowAiService {
         if (target == null || !target.isAlive() || target == owner || ShadowSummoningService.isShadow(target)) return false;
         if (owner.isAlliedTo(target) || target.isAlliedTo(owner)) return false;
         if (target instanceof TamableAnimal pet && owner.getUUID().equals(pet.getOwnerUUID())) return false;
-        if (target instanceof Player) return ModConfigs.PVP_ABILITIES.get();
+        if (target instanceof Player player) {
+            return ModConfigs.PVP_ABILITIES.get() && !player.isCreative() && !player.isSpectator();
+        }
         return target instanceof Enemy;
     }
 

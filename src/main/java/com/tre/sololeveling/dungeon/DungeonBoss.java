@@ -1,5 +1,6 @@
 package com.tre.sololeveling.dungeon;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -119,12 +120,13 @@ public final class DungeonBoss {
                 if (player != null && player.level() == level && player.distanceToSqr(boss) < 80.0D * 80.0D) bar.addPlayer(player);
                 else if (player != null) bar.removePlayer(player);
             }
-            if (!phaseTwo && boss.getHealth() <= boss.getMaxHealth() * 0.5F) enterPhaseTwo(level, session, boss, rank);
+            if (!phaseTwo && boss.getHealth() <= boss.getMaxHealth() * 0.5F) enterPhaseTwo(server, level, session, boss, rank);
             if (!phaseTwo) phaseOne(level, session, boss, rank);
             else phaseTwo(level, session, boss, rank);
         }
 
-        private void enterPhaseTwo(ServerLevel level, DungeonSession session, Ravager boss, DungeonTypes.GateRank rank) {
+        private void enterPhaseTwo(MinecraftServer server, ServerLevel level, DungeonSession session,
+                                   Ravager boss, DungeonTypes.GateRank rank) {
             phaseTwo = true;
             boss.getPersistentData().putBoolean(TAG_PHASE_TWO, true);
             boss.setGlowingTag(true);
@@ -132,6 +134,13 @@ public final class DungeonBoss {
             level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, 1.35F);
             level.sendParticles(ParticleTypes.EXPLOSION, boss.getX(), boss.getY() + 1.0D, boss.getZ(), 12, 1.5D, 0.6D, 1.5D, 0.05D);
             level.sendParticles(ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.0D, boss.getZ(), 100, 2.0D, 1.5D, 2.0D, 0.12D);
+            for (UUID member : session.members()) {
+                ServerPlayer player = server.getPlayerList().getPlayer(member);
+                if (player != null && player.level() == level) {
+                    player.sendSystemMessage(Component.literal("[BOSS] Phase Two — attacks are faster and wider.")
+                            .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD));
+                }
+            }
             if (!phaseAddsSpawned) {
                 phaseAddsSpawned = true;
                 boss.getPersistentData().putBoolean(TAG_PHASE_ADDS, true);
@@ -167,8 +176,12 @@ public final class DungeonBoss {
 
     private static void cleave(ServerLevel level, DungeonSession session, Ravager boss, double radius, float damage) {
         level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ATTACK, SoundSource.HOSTILE, 1.5F, 0.8F);
+        Vec3 look = horizontalLook(boss);
         for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius),
                 player -> session.contains(player.getUUID()))) {
+            Vec3 direction = player.position().subtract(boss.position());
+            if (!validVictim(session, boss, player, radius)
+                    || direction.lengthSqr() > 0.01D && look.dot(direction.normalize()) < 0.15D) continue;
             player.hurt(level.damageSources().mobAttack(boss), damage);
             knock(player, boss.position(), 0.8D);
         }
@@ -180,6 +193,7 @@ public final class DungeonBoss {
         level.playSound(null, boss.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.6F, 0.9F);
         for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius),
                 player -> session.contains(player.getUUID()))) {
+            if (!validVictim(session, boss, player, radius)) continue;
             player.hurt(level.damageSources().mobAttack(boss), damage);
             knock(player, boss.position(), force);
         }
@@ -189,7 +203,7 @@ public final class DungeonBoss {
 
     private static void sovereignBlast(ServerLevel level, DungeonSession session, Ravager boss, float damage) {
         level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, 1.4F);
-        Vec3 look = boss.getLookAngle().normalize();
+        Vec3 look = horizontalLook(boss);
         for (int i = 2; i <= 18; i++) {
             Vec3 point = boss.position().add(look.scale(i)).add(0.0D, 1.0D, 0.0D);
             level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, point.x, point.y, point.z, 5, 0.35D, 0.35D, 0.35D, 0.02D);
@@ -197,11 +211,23 @@ public final class DungeonBoss {
         for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(18.0D),
                 player -> session.contains(player.getUUID()))) {
             Vec3 toPlayer = player.position().subtract(boss.position());
-            if (toPlayer.lengthSqr() > 0.01D && look.dot(toPlayer.normalize()) > 0.78D) {
+            if (validVictim(session, boss, player, 18.0D)
+                    && toPlayer.lengthSqr() > 0.01D && look.dot(toPlayer.normalize()) > 0.78D) {
                 player.hurt(level.damageSources().mobAttack(boss), damage);
                 knock(player, boss.position(), 1.2D);
             }
         }
+    }
+
+    private static boolean validVictim(DungeonSession session, Ravager boss, ServerPlayer player, double radius) {
+        return session.contains(player.getUUID()) && player.isAlive() && !player.isSpectator()
+                && boss.distanceToSqr(player) <= radius * radius && boss.hasLineOfSight(player);
+    }
+
+    private static Vec3 horizontalLook(Ravager boss) {
+        Vec3 look = boss.getLookAngle();
+        Vec3 horizontal = new Vec3(look.x, 0.0D, look.z);
+        return horizontal.lengthSqr() < 1.0E-6D ? new Vec3(0.0D, 0.0D, 1.0D) : horizontal.normalize();
     }
 
     private static void telegraphRing(ServerLevel level, Ravager boss, double radius,
@@ -216,7 +242,7 @@ public final class DungeonBoss {
     }
 
     private static void telegraphLine(ServerLevel level, Ravager boss) {
-        Vec3 look = boss.getLookAngle().normalize();
+        Vec3 look = horizontalLook(boss);
         for (int i = 2; i <= 18; i++) {
             Vec3 point = boss.position().add(look.scale(i)).add(0.0D, 0.2D, 0.0D);
             level.sendParticles(ParticleTypes.WITCH, point.x, point.y, point.z, 2, 0.1D, 0.05D, 0.1D, 0.0D);
@@ -227,7 +253,7 @@ public final class DungeonBoss {
     private static void knock(ServerPlayer player, Vec3 source, double force) {
         Vec3 delta = player.position().subtract(source);
         if (delta.lengthSqr() < 0.01D) delta = new Vec3(1.0D, 0.0D, 0.0D);
-        delta = delta.normalize().scale(force);
+        delta = delta.normalize().scale(Math.min(1.5D, force));
         player.push(delta.x, Math.min(0.65D, force * 0.45D), delta.z);
         player.hurtMarked = true;
     }

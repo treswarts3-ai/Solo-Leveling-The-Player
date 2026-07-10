@@ -130,6 +130,7 @@ public final class DungeonEvents {
         if (server != null) {
             animateGates(server);
             DungeonRuntime.tick(server);
+            DungeonCombatBehavior.tick(server);
             synchronizeDungeonDoors(server);
         }
     }
