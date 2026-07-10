@@ -6,7 +6,6 @@ import com.tre.sololeveling.registry.ModSounds;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
@@ -114,9 +113,10 @@ public class FunctionalItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.literal(detail).withStyle(ChatFormatting.DARK_AQUA));
-        if (kind == Kind.ACCESSORY) tooltip.add(Component.literal("Right-click to equip or unequip").withStyle(ChatFormatting.GRAY));
-        if (kind == Kind.RUNE) tooltip.add(Component.literal("Absorb to unlock " + slotOrSkill).withStyle(ChatFormatting.LIGHT_PURPLE));
-        if (kind == Kind.BLACK_HEART) tooltip.add(Component.literal("Bound progression item").withStyle(ChatFormatting.DARK_PURPLE));
+        if (!detail.isBlank()) tooltip.add(Component.literal(detail).withStyle(ChatFormatting.DARK_AQUA));
+        if (kind == Kind.ACCESSORY) tooltip.add(Component.translatable("tooltip.sololeveling.accessory_use").withStyle(ChatFormatting.GRAY));
+        if (kind == Kind.RUNE) tooltip.add(Component.translatable("tooltip.sololeveling.rune_use", slotOrSkill).withStyle(ChatFormatting.LIGHT_PURPLE));
+        if (kind == Kind.BLACK_HEART) tooltip.add(Component.translatable("tooltip.sololeveling.bound_item").withStyle(ChatFormatting.DARK_PURPLE));
+        tooltip.add(ItemAcquisitionCatalog.line(stack));
     }
 }

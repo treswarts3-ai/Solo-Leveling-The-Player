@@ -3,6 +3,8 @@ package com.tre.sololeveling.gameplay;
 import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.registry.ModItems;
 import com.tre.sololeveling.registry.ModSounds;
+import com.tre.sololeveling.quest.QuestApi;
+import com.tre.sololeveling.quest.QuestManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
@@ -25,6 +27,7 @@ public final class QuestHandler {
     private static final int DAILY_EXERCISE = 30;
 
     public static void tick(ServerPlayer player) {
+        QuestManager.tick(player);
         CompoundTag tag = HunterData.mutable(player);
         if (!HunterData.isAwakened(player)) return;
         ProgressionHandler.tick(player);
@@ -62,6 +65,7 @@ public final class QuestHandler {
 
     public static void onKill(ServerPlayer player, LivingEntity victim) {
         if (!HunterData.isAwakened(player) || victim.getPersistentData().getBoolean("sl_shadow")) return;
+        QuestApi.onKill(player, victim);
         CompoundTag tag = HunterData.mutable(player);
         tag.putInt("daily_kills", tag.getInt("daily_kills") + 1);
         ProgressionHandler.onKill(player);
@@ -105,7 +109,10 @@ public final class QuestHandler {
         }
         if (player.level().getGameTime() < tag.getLong("exercise_finish")) return;
         String key = exerciseKey(tag.getString("exercise_type"));
-        if (!key.isEmpty()) tag.putInt(key, Math.min(DAILY_EXERCISE, tag.getInt(key) + 1));
+        if (!key.isEmpty()) {
+            tag.putInt(key, Math.min(DAILY_EXERCISE, tag.getInt(key) + 1));
+            QuestApi.onExercise(player, tag.getString("exercise_type"), 1);
+        }
         tag.putBoolean("exercise_active", false);
         tag.putLong("daily_last_exercise", player.level().getGameTime());
         player.setPose(net.minecraft.world.entity.Pose.STANDING);
@@ -188,7 +195,7 @@ public final class QuestHandler {
         HunterData.sync(player);
     }
 
-    public static void resetDaily(ServerPlayer player) { HunterData.resetDaily(player); }
+    public static void resetDaily(ServerPlayer player) { HunterData.resetDaily(player); QuestManager.resetDaily(player, true); }
 
     private static void buildPenaltyArena(ServerLevel level, int x, int y, int z) {
         for (int dx = -12; dx <= 12; dx++) {

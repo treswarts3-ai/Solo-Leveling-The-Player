@@ -1,10 +1,13 @@
 {
   "replace": false,
   "values": [
+    "sololeveling:training_dagger",
     "sololeveling:kasakas_venom_fang",
     "sololeveling:barukas_dagger",
     "sololeveling:demon_kings_dagger_left",
     "sololeveling:demon_kings_dagger_right",
+    "sololeveling:moonshadow_dagger",
+    "sololeveling:shadow_reaper_dagger",
     "sololeveling:antares_fang",
     "sololeveling:skill_rune_dagger_rush"
   ]

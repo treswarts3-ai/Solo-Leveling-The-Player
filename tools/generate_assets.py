@@ -4,7 +4,7 @@ import re, json, hashlib, math, wave, struct, subprocess, os, html
 root=Path(__file__).resolve().parents[1]
 java=(root/'src/main/java/com/tre/sololeveling/registry/ModItems.java').read_text()
 ids=[]
-for m in re.finditer(r'(?:weapon|story|accessory|rune|add)\("([a-z0-9_]+)"', java):
+for m in re.finditer(r'(?:weapon|armor|story|accessory|rune|material|consumable)\("([a-z0-9_]+)"', java):
     if m.group(1) not in ids: ids.append(m.group(1))
 res=root/'src/main/resources'
 itemtex=res/'assets/sololeveling/textures/item'; itemtex.mkdir(parents=True,exist_ok=True)
@@ -35,7 +35,7 @@ def palette_for(id):
 def pixels_for(id,n=16):
     p=palette_for(id); img=Image.new('RGBA',(n,n),(0,0,0,0)); d=ImageDraw.Draw(img)
     weapon=any(x in id for x in ['dagger','sword','fang']) and not any(x in id for x in ['cerberus','raikan'])
-    armoritem=any(x in id for x in ['chestplate','coat','top','trousers','pants','boots','shoes','helmet','gloves','gauntlets'])
+    armoritem=any(x in id for x in ['chestplate','coat','top','jacket','trousers','leggings','pants','boots','shoes','helmet','hood','gloves','gauntlets'])
     potion='potion' in id or 'water_of_life' in id
     rune='rune' in id
     key='key' in id
@@ -49,13 +49,13 @@ def pixels_for(id,n=16):
         d.line([(7 if not flip else 8,11),(10 if not flip else 5,14)],fill=p[4],width=2)
         d.point((8 if not flip else 7,3),fill=p[5])
     elif armoritem:
-        if 'helmet' in id:
+        if 'helmet' in id or 'hood' in id:
             d.polygon([(4,4),(6,2),(10,2),(12,4),(12,10),(10,12),(6,12),(4,10)],fill=p[2]); d.rectangle((5,5,11,8),fill=p[3]); d.rectangle((6,6,10,6),fill=p[4])
         elif any(x in id for x in ['boots','shoes']):
             d.polygon([(4,3),(8,3),(8,11),(12,12),(12,14),(4,14)],fill=p[2]); d.line([(5,4),(7,10),(11,12)],fill=p[4],width=1)
         elif any(x in id for x in ['gloves','gauntlets']):
             d.polygon([(5,2),(10,2),(12,5),(10,12),(7,14),(4,11),(4,5)],fill=p[2]); d.line([(6,3),(7,11)],fill=p[4],width=2)
-        elif any(x in id for x in ['pants','trousers']):
+        elif any(x in id for x in ['pants','trousers','leggings']):
             d.polygon([(4,2),(12,2),(11,8),(10,14),(7,14),(8,8),(6,14),(3,14),(4,8)],fill=p[2]); d.line([(5,3),(11,3)],fill=p[4],width=1)
         else:
             d.polygon([(4,2),(7,3),(9,3),(12,2),(14,6),(12,8),(11,14),(5,14),(4,8),(2,6)],fill=p[2]); d.line([(4,3),(8,6),(12,3)],fill=p[4],width=2)
@@ -69,7 +69,7 @@ def pixels_for(id,n=16):
         d.rectangle((2,4,13,13),fill=p[2],outline=p[3]); d.rectangle((1,3,14,6),fill=p[3]); d.line([(8,3),(8,13)],fill=p[4],width=2); d.point((8,8),fill=p[5])
     elif heart:
         d.polygon([(8,14),(2,7),(2,4),(4,2),(7,3),(8,5),(9,3),(12,2),(14,4),(14,7)],fill=p[4]); d.line([(8,5),(8,13)],fill=p[5],width=1)
-    elif any(x in id for x in ['necklace','ring','earring','orb']):
+    elif any(x in id for x in ['necklace','ring','earring','orb','belt']):
         d.ellipse((3,3,12,12),outline=p[3],width=2); d.ellipse((6,6,9,9),fill=p[4]); d.point((8,7),fill=p[5])
     elif any(x in id for x in ['stone','crystal','essence','venom']):
         d.polygon([(8,1),(13,6),(11,13),(6,15),(2,9),(4,3)],fill=p[3]); d.polygon([(8,2),(10,7),(8,13),(5,8)],fill=p[4]); d.point((8,4),fill=p[5])

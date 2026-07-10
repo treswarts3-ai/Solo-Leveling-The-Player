@@ -8,7 +8,12 @@ import com.tre.sololeveling.gameplay.PassiveHandler;
 import com.tre.sololeveling.gameplay.ProgressionHandler;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.gameplay.ShadowHandler;
+import com.tre.sololeveling.quest.QuestApi;
+import com.tre.sololeveling.quest.QuestManager;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -19,6 +24,7 @@ import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.event.TickEvent;
@@ -39,12 +45,18 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public void login(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) HunterData.sync(player);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HunterData.initialize(player);
+            QuestManager.onLogin(player);
+        }
     }
 
     @SubscribeEvent
     public void respawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) HunterData.sync(player);
+        if (event.getEntity() instanceof ServerPlayer player) {
+            HunterData.initialize(player);
+            QuestManager.onLogin(player);
+        }
     }
 
     @SubscribeEvent
@@ -53,7 +65,7 @@ public final class CommonEvents {
             PassiveHandler.breakStealth(player);
             AbilityHandler.cancel(player);
             ShadowHandler.dismissAll(player);
-            HunterData.sync(player);
+            HunterData.initialize(player);
         }
     }
 
@@ -88,9 +100,26 @@ public final class CommonEvents {
     }
 
 
+
+    @SubscribeEvent
+    public void itemPickup(EntityItemPickupEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) QuestApi.onCollected(player, event.getItem().getItem());
+    }
+
     @SubscribeEvent
     public void attack(LivingAttackEvent event) {
-        if (ShadowHandler.shouldCancelAttack(event.getEntity(), event.getSource().getEntity())) event.setCanceled(true);
+        if (ShadowHandler.shouldCancelAttack(event.getEntity(), event.getSource().getEntity())) {
+            event.setCanceled(true);
+            return;
+        }
+        if (event.getEntity() instanceof ServerPlayer victim
+                && HunterData.isAwakened(victim)
+                && event.getSource().getEntity() != victim
+                && !event.getSource().is(DamageTypeTags.BYPASSES_INVULNERABILITY)
+                && victim.getRandom().nextDouble() < HunterData.getEvasionChance(victim)) {
+            event.setCanceled(true);
+            victim.displayClientMessage(Component.literal("[EVADE]").withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD), true);
+        }
     }
 
     @SubscribeEvent
@@ -106,11 +135,17 @@ public final class CommonEvents {
         if (event.getSource().getEntity() instanceof ServerPlayer attacker && HunterData.isAwakened(attacker)) {
             HunterData.recordCombat(attacker);
             PassiveHandler.breakStealth(attacker);
+            boolean generatedDamage = attacker.getPersistentData().getBoolean("sl_ability_damage")
+                    || attacker.getPersistentData().getBoolean("sl_weapon_bonus");
+            if (!generatedDamage && attacker.getRandom().nextDouble() < HunterData.getCriticalChance(attacker)) {
+                double multiplier = HunterData.getCriticalDamageMultiplier(attacker);
+                event.setAmount((float)(event.getAmount() * multiplier));
+                attacker.displayClientMessage(Component.literal(String.format("[CRITICAL x%.2f]", multiplier))
+                        .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), true);
+            }
             String held = attacker.getMainHandItem().getItem().toString();
             boolean dagger = held.contains("dagger") || held.contains("fang") || held.contains("wrath");
-            if (dagger && HunterData.hasSkill(attacker, "advanced_dagger_techniques")
-                    && !attacker.getPersistentData().getBoolean("sl_ability_damage")
-                    && !attacker.getPersistentData().getBoolean("sl_weapon_bonus")) {
+            if (dagger && HunterData.hasSkill(attacker, "advanced_dagger_techniques") && !generatedDamage) {
                 event.setAmount(event.getAmount() * 1.33F);
             }
         }

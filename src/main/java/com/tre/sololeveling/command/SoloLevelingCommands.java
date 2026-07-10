@@ -10,12 +10,14 @@ import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ShadowHandler;
 import com.tre.sololeveling.registry.ModItems;
+import com.tre.sololeveling.quest.QuestCommands;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 
@@ -36,11 +38,10 @@ public final class SoloLevelingCommands {
                                 .executes(ctx -> status(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))))
                 .then(Commands.literal("awaken").requires(source -> source.hasPermission(2))
                         .then(playerTarget(HunterData::awaken, "System awakened")))
+                .then(Commands.literal("unawaken").requires(source -> source.hasPermission(2))
+                        .then(playerTarget(player -> HunterData.setAwakened(player, false), "System revoked")))
                 .then(Commands.literal("system").requires(source -> source.hasPermission(2))
-                        .then(Commands.literal("revoke").then(playerTarget(player -> {
-                            HunterData.mutable(player).putBoolean("awakened", false);
-                            HunterData.sync(player);
-                        }, "System revoked"))))
+                        .then(Commands.literal("revoke").then(playerTarget(player -> HunterData.setAwakened(player, false), "System revoked"))))
                 .then(xpCommands())
                 .then(levelCommands())
                 .then(manaCommands())
@@ -59,6 +60,17 @@ public final class SoloLevelingCommands {
                 .then(shadowCommands())
                 .then(Commands.literal("giveall").requires(source -> source.hasPermission(2))
                         .then(playerTarget(player -> ModItems.ALL.forEach(item -> player.getInventory().add(new ItemStack(item.get()))), "All mod items granted")))
+                .then(Commands.literal("data").requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("inspect").then(Commands.argument("player", EntityArgument.player())
+                                .executes(ctx -> inspect(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))))
+                        .then(Commands.literal("reset").then(playerTarget(HunterData::resetAllProgression, "Progression data reset"))))
+                .then(Commands.literal("reset").requires(source -> source.hasPermission(2))
+                        .then(playerTarget(HunterData::resetAllProgression, "Progression data reset")))
+                .then(Commands.literal("recalculate").requires(source -> source.hasPermission(2))
+                        .then(playerTarget(player -> { HunterData.recalculateAttributes(player); HunterData.sync(player); }, "Attributes recalculated")))
+                .then(Commands.literal("test").requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("progression").then(Commands.argument("player", EntityArgument.player())
+                                .executes(ctx -> testProgression(ctx.getSource(), EntityArgument.getPlayer(ctx, "player"))))))
                 .then(Commands.literal("sync").requires(source -> source.hasPermission(2))
                         .then(playerTarget(HunterData::sync, "Data synchronized")));
     }
@@ -67,19 +79,19 @@ public final class SoloLevelingCommands {
         return Commands.literal("xp").requires(source -> source.hasPermission(2))
                 .then(valueTarget("add", 0, Integer.MAX_VALUE, HunterData::addXp))
                 .then(valueTarget("set", 0, Integer.MAX_VALUE, HunterData::setXp))
-                .then(valueTarget("remove", 0, Integer.MAX_VALUE, (player, value) -> HunterData.setXp(player, Math.max(0, HunterData.getXp(player) - value))));
+                .then(valueTarget("remove", 0, Integer.MAX_VALUE, HunterData::removeXp));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> levelCommands() {
         return Commands.literal("level").requires(source -> source.hasPermission(2))
-                .then(valueTarget("add", 0, 10000, (player, value) -> HunterData.setLevel(player, HunterData.getLevel(player) + value)))
+                .then(valueTarget("add", 0, 10000, HunterData::addLevels))
                 .then(valueTarget("set", 1, 10000, HunterData::setLevel))
-                .then(valueTarget("remove", 0, 10000, (player, value) -> HunterData.setLevel(player, HunterData.getLevel(player) - value)));
+                .then(valueTarget("remove", 0, 10000, HunterData::removeLevels));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> manaCommands() {
         return Commands.literal("mana").requires(source -> source.hasPermission(2))
-                .then(valueTarget("add", 0, 1_000_000, (player, value) -> { HunterData.addMana(player, value); HunterData.sync(player); }))
+                .then(valueTarget("add", 0, 1_000_000, HunterData::addMana))
                 .then(valueTarget("set", 0, 1_000_000, HunterData::setMana))
                 .then(valueTarget("remove", 0, 1_000_000, (player, value) -> HunterData.setMana(player, HunterData.getMana(player) - value)))
                 .then(Commands.literal("fill").then(playerTarget(player -> HunterData.setMana(player, HunterData.getMaxMana(player)), "Mana restored")));
@@ -88,13 +100,15 @@ public final class SoloLevelingCommands {
     private static LiteralArgumentBuilder<CommandSourceStack> statPointCommands() {
         return Commands.literal("statpoints").requires(source -> source.hasPermission(2))
                 .then(valueTarget("add", 0, 100000, HunterData::addStatPoints))
-                .then(valueTarget("set", 0, 100000, HunterData::setStatPoints));
+                .then(valueTarget("set", 0, 100000, HunterData::setStatPoints))
+                .then(valueTarget("remove", 0, 100000, HunterData::removeStatPoints));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> statCommands() {
         return Commands.literal("stat").requires(source -> source.hasPermission(2))
-                .then(Commands.literal("set").then(statValueTarget((player, stat, value) -> HunterData.setStat(player, stat, value))))
-                .then(Commands.literal("add").then(statValueTarget((player, stat, value) -> HunterData.setStat(player, stat, HunterData.getStat(player, stat) + value))))
+                .then(Commands.literal("set").then(statValueTarget(1, 1_000_000, HunterData::setStat)))
+                .then(Commands.literal("add").then(statValueTarget(0, 1_000_000, HunterData::addStat)))
+                .then(Commands.literal("remove").then(statValueTarget(0, 1_000_000, HunterData::removeStat)))
                 .then(Commands.literal("reset").then(playerTarget(HunterData::resetStats, "Stats reset")));
     }
 
@@ -126,9 +140,18 @@ public final class SoloLevelingCommands {
                         .then(Commands.argument("player", EntityArgument.player())
                                 .then(Commands.argument("rank", StringArgumentType.greedyString())
                                         .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(RANKS, builder))
-                                        .executes(ctx -> run(ctx.getSource(), EntityArgument.getPlayer(ctx, "player"),
-                                                player -> HunterData.setRankOverride(player, StringArgumentType.getString(ctx, "rank")), "Rank changed")))))
-                .then(Commands.literal("clear").then(playerTarget(HunterData::clearRankOverride, "Rank override cleared")));
+                                        .executes(ctx -> {
+                                            ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+                                            String rankValue = StringArgumentType.getString(ctx, "rank");
+                                            if (!HunterData.setHunterRank(player, rankValue)) {
+                                                ctx.getSource().sendFailure(Component.literal("Invalid rank. Use E-Rank through Shadow Monarch."));
+                                                return 0;
+                                            }
+                                            return success(ctx.getSource(), player, "Rank changed");
+                                        }))))
+                .then(valueTarget("add", 0, 7, HunterData::addHunterRanks))
+                .then(valueTarget("remove", 0, 7, HunterData::removeHunterRanks))
+                .then(Commands.literal("clear").then(playerTarget(HunterData::clearRankOverride, "Rank returned to automatic progression")));
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> jobCommands() {
@@ -168,9 +191,7 @@ public final class SoloLevelingCommands {
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> questCommands() {
-        return Commands.literal("quest").requires(source -> source.hasPermission(2))
-                .then(Commands.literal("mainstage").then(valueTargetNode(0, 5, HunterData::setProgressionStage, "Main quest stage changed")))
-                .then(Commands.literal("reset").then(playerTarget(HunterData::resetProgression, "Quest progression reset")));
+        return QuestCommands.node();
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> penaltyCommands() {
@@ -205,13 +226,24 @@ public final class SoloLevelingCommands {
                                 player -> consumer.accept(player, IntegerArgumentType.getInteger(ctx, "amount")), success)));
     }
 
-    private static ArgumentBuilder<CommandSourceStack, ?> statValueTarget(PlayerStatIntConsumer consumer) {
+    private static ArgumentBuilder<CommandSourceStack, ?> statValueTarget(int min, int max, PlayerStatIntConsumer consumer) {
         return Commands.argument("player", EntityArgument.player())
                 .then(Commands.argument("stat", StringArgumentType.word())
                         .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(STATS, builder))
-                        .then(Commands.argument("amount", IntegerArgumentType.integer(-10000, 10000))
-                                .executes(ctx -> run(ctx.getSource(), EntityArgument.getPlayer(ctx, "player"), player ->
-                                        consumer.accept(player, StringArgumentType.getString(ctx, "stat"), IntegerArgumentType.getInteger(ctx, "amount")), "Stat changed"))));
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(min, max))
+                                .executes(ctx -> {
+                                    ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+                                    String stat = StringArgumentType.getString(ctx, "stat");
+                                    if (!HunterData.isValidStat(stat)) {
+                                        ctx.getSource().sendFailure(Component.literal("Invalid stat. Use strength, agility, stamina, intelligence, or sense."));
+                                        return 0;
+                                    }
+                                    if (!consumer.accept(player, stat, IntegerArgumentType.getInteger(ctx, "amount"))) {
+                                        ctx.getSource().sendFailure(Component.literal("Stat change was rejected."));
+                                        return 0;
+                                    }
+                                    return success(ctx.getSource(), player, "Stat changed");
+                                })));
     }
 
     private static ArgumentBuilder<CommandSourceStack, ?> skillTarget(PlayerSkillConsumer consumer) {
@@ -229,6 +261,25 @@ public final class SoloLevelingCommands {
                                 consumer.accept(player, StringArgumentType.getString(ctx, argumentName)), success)));
     }
 
+    private static int testProgression(CommandSourceStack source, ServerPlayer player) {
+        HunterData.recalculateAttributes(player);
+        HunterData.recalculateAttributes(player);
+        CompoundTag tag = HunterData.snapshot(player);
+        boolean xpValid = tag.getInt("level") >= 1 && tag.getInt("xp") >= 0
+                && (tag.getInt("level") >= ModConfigs.MAX_HUNTER_LEVEL.get() || tag.getInt("xp") < tag.getInt("xp_needed"));
+        boolean manaValid = tag.getInt("mana") >= 0 && tag.getInt("mana") <= tag.getInt("max_mana");
+        boolean statsValid = true;
+        for (String stat : STATS) statsValid &= tag.getInt(stat) >= 1 && tag.getInt(stat) <= ModConfigs.MAX_PRIMARY_STAT.get();
+        int duplicates = HunterData.countDuplicateManagedModifiers(player);
+        boolean passed = xpValid && manaValid && statsValid && duplicates == 0;
+        Component result = Component.literal("Progression test " + (passed ? "PASS" : "FAIL")
+                + " | XP " + xpValid + " | Mana " + manaValid + " | Stats " + statsValid + " | Duplicate modifiers " + duplicates)
+                .withStyle(passed ? ChatFormatting.GREEN : ChatFormatting.RED);
+        source.sendSuccess(() -> result, false);
+        HunterData.sync(player);
+        return passed ? 1 : 0;
+    }
+
     private static int status(CommandSourceStack source, ServerPlayer player) {
         source.sendSuccess(() -> Component.literal("[Solo Leveling] " + player.getScoreboardName() + " | Lv " + HunterData.getLevel(player)
                 + " | " + HunterData.getRank(player) + " | XP " + HunterData.getXp(player) + "/" + HunterData.xpNeeded(HunterData.getLevel(player))
@@ -236,20 +287,37 @@ public final class SoloLevelingCommands {
         source.sendSuccess(() -> Component.literal("STR " + HunterData.getStat(player, "strength") + " AGI " + HunterData.getStat(player, "agility")
                 + " STA " + HunterData.getStat(player, "stamina") + " INT " + HunterData.getStat(player, "intelligence")
                 + " SEN " + HunterData.getStat(player, "sense") + " | Points " + HunterData.getStatPoints(player)
-                + " | Stage " + HunterData.mutable(player).getInt("progression_stage") + " | MaxLv " + ModConfigs.MAX_HUNTER_LEVEL.get()), false);
+                + " | Crit " + percent(HunterData.getCriticalChance(player)) + " x" + String.format("%.2f", HunterData.getCriticalDamageMultiplier(player))
+                + " | Evasion " + percent(HunterData.getEvasionChance(player))), false);
+        return 1;
+    }
+
+    private static int inspect(CommandSourceStack source, ServerPlayer player) {
+        CompoundTag tag = HunterData.snapshot(player);
+        status(source, player);
+        source.sendSuccess(() -> Component.literal("Data v" + tag.getInt("data_version") + " | Awakened " + tag.getBoolean("awakened")
+                + " | Rewarded level " + tag.getInt("rewarded_level") + " | Rank tier " + tag.getInt("hunter_rank_tier")
+                + " | HP regen " + String.format("%.3f", tag.getInt("health_regen_milli") / 1000.0D) + "/s"
+                + " | MP regen " + tag.getInt("mana_regen") + "/s").withStyle(ChatFormatting.GRAY), false);
+        return 1;
+    }
+
+    private static String percent(double value) { return String.format("%.1f%%", value * 100.0D); }
+
+    private static int success(CommandSourceStack source, ServerPlayer player, String message) {
+        source.sendSuccess(() -> Component.literal(message + ": " + player.getScoreboardName()).withStyle(ChatFormatting.AQUA), true);
         return 1;
     }
 
     private static int run(CommandSourceStack source, ServerPlayer player, PlayerConsumer consumer, String success) {
         consumer.accept(player);
-        source.sendSuccess(() -> Component.literal(success + ": " + player.getScoreboardName()).withStyle(ChatFormatting.AQUA), true);
-        return 1;
+        return success(source, player, success);
     }
 
     @FunctionalInterface private interface PlayerConsumer { void accept(ServerPlayer player); }
     @FunctionalInterface private interface PlayerIntConsumer { void accept(ServerPlayer player, int value); }
     @FunctionalInterface private interface PlayerStringConsumer { void accept(ServerPlayer player, String value); }
-    @FunctionalInterface private interface PlayerStatIntConsumer { void accept(ServerPlayer player, String stat, int value); }
+    @FunctionalInterface private interface PlayerStatIntConsumer { boolean accept(ServerPlayer player, String stat, int value); }
     @FunctionalInterface private interface PlayerSkillConsumer { boolean accept(ServerPlayer player, String skill); }
     private SoloLevelingCommands() {}
 }

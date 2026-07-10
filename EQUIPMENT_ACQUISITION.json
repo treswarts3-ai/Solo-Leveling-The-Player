@@ -1,0 +1,31 @@
+{
+  "recipes": [
+    "enchanted_steel",
+    "greater_healing_potion",
+    "greater_mana_potion",
+    "healing_potion",
+    "hunters_ring",
+    "knight_killer",
+    "mana_potion",
+    "mana_weave_necklace",
+    "monarch_reinforcement_core",
+    "moonshadow_dagger",
+    "novice_hunter_boots",
+    "novice_hunter_hood",
+    "novice_hunter_jacket",
+    "novice_hunter_leggings",
+    "reinforcement_core",
+    "shadow_reaper_dagger",
+    "training_dagger"
+  ],
+  "loot_tables": [
+    "low_rank_dungeon",
+    "mid_rank_dungeon",
+    "monarch_cache"
+  ],
+  "loot_modifiers": [
+    "low_rank_dungeon",
+    "mid_rank_dungeon",
+    "monarch_cache"
+  ]
+}
