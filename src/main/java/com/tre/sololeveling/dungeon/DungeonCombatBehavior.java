@@ -49,7 +49,7 @@ public final class DungeonCombatBehavior {
                 }
                 mob.setTarget(target);
                 mob.getLookControl().setLookAt(target, 30.0F, 30.0F);
-                runRole(level, mob, target, definition, now);
+                runRole(level, session, mob, target, definition, now);
             }
         }
     }
@@ -68,7 +68,7 @@ public final class DungeonCombatBehavior {
                 && session.contains(player.getUUID()) && mob.distanceToSqr(player) <= range * range;
     }
 
-    private static void runRole(ServerLevel level, Mob mob, ServerPlayer target,
+    private static void runRole(ServerLevel level, DungeonSession session, Mob mob, ServerPlayer target,
                                 DungeonTypes.EnemyDefinition definition, long now) {
         CompoundTag data = mob.getPersistentData();
         if (data.getLong(RECOVERY_UNTIL) > now) {
@@ -76,7 +76,7 @@ public final class DungeonCombatBehavior {
             return;
         }
         if (data.getLong(EXECUTE_AT) > 0L) {
-            if (now >= data.getLong(EXECUTE_AT)) execute(level, mob, target, definition, data, now);
+            if (now >= data.getLong(EXECUTE_AT)) execute(level, session, mob, target, definition, data, now);
             return;
         }
         if (now < data.getLong(NEXT_ACTION)) return;
@@ -167,7 +167,7 @@ public final class DungeonCombatBehavior {
         level.playSound(null, mob.blockPosition(), sound, SoundSource.HOSTILE, 0.9F, pitch);
     }
 
-    private static void execute(ServerLevel level, Mob mob, ServerPlayer target,
+    private static void execute(ServerLevel level, DungeonSession session, Mob mob, ServerPlayer target,
                                 DungeonTypes.EnemyDefinition definition, CompoundTag data, long now) {
         String action = data.getString(ACTION);
         data.putString(ACTION, "");
@@ -175,7 +175,7 @@ public final class DungeonCombatBehavior {
         float base = (float)Math.max(2.0D, definition.attackDamage());
         switch (action) {
             case "melee_heavy" -> {
-                if (mob.distanceToSqr(target) <= 3.8D * 3.8D && mob.hasLineOfSight(target)) {
+                if (validMember(level, session, target, mob, 3.8D) && mob.hasLineOfSight(target)) {
                     target.hurt(level.damageSources().mobAttack(mob), base * 1.35F);
                     knock(target, mob.position(), 0.65D);
                 }
@@ -190,7 +190,7 @@ public final class DungeonCombatBehavior {
                     mob.setDeltaMovement(direction.x * 1.15D, 0.34D, direction.z * 1.15D);
                     mob.hurtMarked = true;
                 }
-                if (mob.distanceToSqr(target) <= 3.0D * 3.0D && mob.hasLineOfSight(target)) {
+                if (validMember(level, session, target, mob, 3.0D) && mob.hasLineOfSight(target)) {
                     target.hurt(level.damageSources().mobAttack(mob), base * 1.05F);
                 }
                 mob.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 16, 1, false, false));
@@ -199,7 +199,7 @@ public final class DungeonCombatBehavior {
             }
             case "tank_slam" -> {
                 for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, mob.getBoundingBox().inflate(4.5D),
-                        candidate -> candidate.isAlive() && !candidate.isSpectator() && mob.hasLineOfSight(candidate))) {
+                        candidate -> validMember(level, session, candidate, mob, 4.5D) && mob.hasLineOfSight(candidate))) {
                     player.hurt(level.damageSources().mobAttack(mob), base * 1.15F);
                     knock(player, mob.position(), 1.0D);
                 }
@@ -209,7 +209,7 @@ public final class DungeonCombatBehavior {
                 data.putLong(NEXT_ACTION, now + 100L);
             }
             case "ranged_shot" -> {
-                if (mob.distanceToSqr(target) <= 20.0D * 20.0D && mob.hasLineOfSight(target)) {
+                if (validMember(level, session, target, mob, 20.0D) && mob.hasLineOfSight(target)) {
                     target.hurt(level.damageSources().mobAttack(mob), base * 0.80F);
                     level.sendParticles(ParticleTypes.CRIT, target.getX(), target.getY() + 1.0D, target.getZ(),
                             10, 0.3D, 0.5D, 0.3D, 0.03D);
@@ -224,14 +224,14 @@ public final class DungeonCombatBehavior {
                     mob.setDeltaMovement(direction.x * 1.35D, 0.22D, direction.z * 1.35D);
                     mob.hurtMarked = true;
                 }
-                if (mob.distanceToSqr(target) <= 3.4D * 3.4D && mob.hasLineOfSight(target)) {
+                if (validMember(level, session, target, mob, 3.4D) && mob.hasLineOfSight(target)) {
                     target.hurt(level.damageSources().mobAttack(mob), base * 1.15F);
                 }
                 data.putLong(NEXT_ACTION, now + 48L);
             }
             case "elite_cleave" -> {
                 for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, mob.getBoundingBox().inflate(5.5D),
-                        candidate -> candidate.isAlive() && !candidate.isSpectator() && mob.hasLineOfSight(candidate))) {
+                        candidate -> validMember(level, session, candidate, mob, 5.5D) && mob.hasLineOfSight(candidate))) {
                     player.hurt(level.damageSources().mobAttack(mob), base * 1.20F);
                     knock(player, mob.position(), 0.75D);
                 }
