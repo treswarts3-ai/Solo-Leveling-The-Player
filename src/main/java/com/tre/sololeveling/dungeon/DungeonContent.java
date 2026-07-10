@@ -16,7 +16,7 @@ public final class DungeonContent {
         enemy(new DungeonTypes.EnemyDefinition("steel_fang_raider", DungeonTypes.EnemyKind.FAST, 18, 4, 0.38, 0, false, true));
         enemy(new DungeonTypes.EnemyDefinition("stone_guardian", DungeonTypes.EnemyKind.TANK, 80, 9, 0.18, 12, false, true));
         enemy(new DungeonTypes.EnemyDefinition("dungeon_archer", DungeonTypes.EnemyKind.RANGED, 28, 5, 0.25, 2, false, true));
-        enemy(new DungeonTypes.EnemyDefinition("orc_commander", DungeonTypes.EnemyKind.ELITE, 140, 13, 0.29, 10, true, true));
+        enemy(new DungeonTypes.EnemyDefinition("orc_commander", DungeonTypes.EnemyKind.ELITE, 110, 10, 0.27, 8, true, true));
         enemy(new DungeonTypes.EnemyDefinition("shadow_goblin", DungeonTypes.EnemyKind.MELEE, 36, 7, 0.27, 4, false, true));
         enemy(new DungeonTypes.EnemyDefinition("shadow_raider", DungeonTypes.EnemyKind.FAST, 28, 6, 0.42, 2, false, true));
         enemy(new DungeonTypes.EnemyDefinition("shadow_guardian", DungeonTypes.EnemyKind.TANK, 110, 12, 0.20, 16, false, true));
@@ -24,19 +24,19 @@ public final class DungeonContent {
         enemy(new DungeonTypes.EnemyDefinition("shadow_commander", DungeonTypes.EnemyKind.ELITE, 190, 16, 0.31, 14, true, true));
 
         Map<String, DungeonTypes.WaveDefinition> lowWaves = waves(
-                wave("low_wave_1", false, spawn("goblin_soldier", 4), spawn("steel_fang_raider", 2)),
-                wave("low_collection_wave", true, spawn("goblin_soldier", 4), spawn("dungeon_archer", 2)),
-                wave("low_elite", false, spawn("orc_commander", 1), spawn("goblin_soldier", 2))
+                wave("low_wave_1", false, spawn("goblin_soldier", 3), spawn("steel_fang_raider", 2)),
+                wave("low_collection_wave", true, spawn("goblin_soldier", 3), spawn("dungeon_archer", 2)),
+                wave("low_elite", false, spawn("orc_commander", 1), spawn("goblin_soldier", 1))
         );
         template(new DungeonTypes.DungeonTemplate(
                 "abandoned_subway", "Abandoned Subway", DungeonTypes.GateRank.E, 20 * 60 * 14,
                 List.of(
-                        objective(DungeonTypes.ObjectiveType.WAVE, "clear_platform", "low_wave_1", 6, 20 * 60 * 4, "Clear the abandoned platform"),
-                        objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_mana_crystals", "low_collection_wave", 4, 20 * 60 * 4, "Recover four mana crystals"),
-                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_station_guard", "low_elite", 3, 20 * 60 * 3, "Defeat the station guard and escort"),
+                        objective(DungeonTypes.ObjectiveType.WAVE, "clear_platform", "low_wave_1", 5, 20 * 60 * 4, "Clear the abandoned platform"),
+                        objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_mana_crystals", "low_collection_wave", 3, 20 * 60 * 4, "Recover three mana crystals"),
+                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_station_guard", "low_elite", 2, 20 * 60 * 3, "Defeat the station guard and escort"),
                         objective(DungeonTypes.ObjectiveType.BOSS, "defeat_subway_warden", "subway_warden", 1, 20 * 60 * 5, "Defeat the Subway Warden"),
                         objective(DungeonTypes.ObjectiveType.REWARD, "claim_low_reward", "reward_room", 1, 20 * 60, "Enter the sealed reward vault")
-                ), lowWaves, reward(900, 350, item("minecraft:emerald", 5), item("minecraft:amethyst_shard", 10), item("minecraft:gold_ingot", 4))
+                ), lowWaves, reward(750, 280, item("minecraft:emerald", 4), item("minecraft:amethyst_shard", 8), item("minecraft:gold_ingot", 3))
         ));
 
         Map<String, DungeonTypes.WaveDefinition> midWaves = waves(

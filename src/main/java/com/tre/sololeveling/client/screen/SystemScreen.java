@@ -140,23 +140,12 @@ public final class SystemScreen extends Screen {
     }
 
     private void addQuestButtons() {
-        int y = contentY + contentHeight - 20;
-        int claimWidth = Math.min(72, Math.max(56, contentWidth / 4));
-        int remaining = contentWidth - claimWidth - 6;
-        int exerciseWidth = Math.max(42, remaining / 3);
-        String[] names = {"Push-up", "Sit-up", "Squat"};
-        String[] ids = {"pushup", "situp", "squat"};
-        for (int i = 0; i < 3; i++) {
-            int index = i;
-            Button button = Button.builder(Component.literal(names[i]), ignored -> send("EXERCISE:" + ids[index]))
-                    .bounds(contentX + i * exerciseWidth, y, exerciseWidth - 2, 18).build();
-            addRenderableWidget(button);
-        }
-        Button claim = Button.builder(Component.literal("CLAIM"), ignored -> send("CLAIM_DAILY"))
-                .bounds(contentX + contentWidth - claimWidth, y, claimWidth, 18).build();
-        actionButtons.put("claim_daily", claim);
-        addRenderableWidget(claim);
-    }
+    int y = contentY + contentHeight - 20;
+    Button claim = Button.builder(Component.literal("CLAIM DAILY REWARD"), ignored -> send("CLAIM_DAILY"))
+            .bounds(contentX, y, Math.min(150, contentWidth), 18).build();
+    actionButtons.put("claim_daily", claim);
+    addRenderableWidget(claim);
+}
 
     private void addStoreButtons() {
         int columns = contentWidth >= 270 ? 2 : 1;
@@ -386,13 +375,13 @@ public final class SystemScreen extends Screen {
         graphics.drawString(font, data.activeQuestName(), contentX + 7, y + 6, SystemUi.Theme.VIOLET, false);
         graphics.drawString(font, SystemUi.Theme.ellipsize(font, data.activeQuestProgress(), contentWidth - 14), contentX + 7, y + 19, SystemUi.Theme.TEXT_DIM, false);
         y += 40;
-        graphics.drawString(font, "DAILY — PREPARATION TO BECOME POWERFUL", contentX, y, SystemUi.Theme.CYAN, false);
+        graphics.drawString(font, "DAILY — ADAPTIVE HUNTER TRAINING", contentX, y, SystemUi.Theme.CYAN, false);
         y += 14;
-        objective(graphics, y, "Hostile mobs", data.raw().getInt("daily_kills"), 10); y += 14;
-        objective(graphics, y, "Run blocks", data.raw().getInt("daily_run"), 1000); y += 14;
-        objective(graphics, y, "Push-ups", data.raw().getInt("daily_pushups"), 30); y += 14;
-        objective(graphics, y, "Sit-ups", data.raw().getInt("daily_situps"), 30); y += 14;
-        objective(graphics, y, "Squats", data.raw().getInt("daily_squats"), 30); y += 16;
+        objective(graphics, y, "Defeat enemies", data.raw().getInt("daily_kills"), 8); y += 14;
+        objective(graphics, y, "Sprint distance", data.raw().getInt("daily_run"), 600); y += 14;
+        objective(graphics, y, "Land attacks", data.raw().getInt("daily_attacks"), 20); y += 14;
+        objective(graphics, y, "Jump and traverse", data.raw().getInt("daily_jumps"), 15); y += 14;
+        objective(graphics, y, "Use abilities", data.raw().getInt("daily_abilities"), 5); y += 16;
         String state = data.dailyClaimed() ? "REWARD CLAIMED" : data.dailyComplete() ? "COMPLETE — CLAIM AVAILABLE" : "IN PROGRESS";
         graphics.drawString(font, state, contentX, y, data.dailyComplete() ? SystemUi.Theme.SUCCESS : SystemUi.Theme.WARNING, false);
         if (data.raw().getBoolean("emergency_active")) {

@@ -1,11 +1,12 @@
 package com.tre.sololeveling;
 
 import com.tre.sololeveling.config.ModConfigs;
+import com.tre.sololeveling.dungeon.DungeonBlocks;
 import com.tre.sololeveling.equipment.EquipmentConfig;
+import com.tre.sololeveling.integration.IntegrationBootstrap;
 import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.registry.ModItems;
 import com.tre.sololeveling.registry.ModSounds;
-import com.tre.sololeveling.integration.IntegrationBootstrap;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
@@ -24,6 +25,7 @@ public final class SoloLevelingMod {
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, ModConfigs.SERVER_SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.SERVER, EquipmentConfig.SPEC, "sololeveling-equipment.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ModConfigs.CLIENT_SPEC);
+        DungeonBlocks.BLOCKS.register(modBus);
         ModItems.ITEMS.register(modBus);
         ModSounds.SOUNDS.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
