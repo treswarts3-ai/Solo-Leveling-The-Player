@@ -1,1 +1,1 @@
-Trigger verified organized source import after corrected archive staging.
+Trigger verified import with explicit asset dependencies.
