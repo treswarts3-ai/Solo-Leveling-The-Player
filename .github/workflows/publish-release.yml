@@ -1,0 +1,118 @@
+name: Publish Prerelease
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/publish-release.yml'
+      - 'gradle.properties'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-sololeveling-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Build release JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew clean build --stacktrace --no-daemon
+
+      - name: Prepare release files
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(sed -n 's/^mod_version=//p' gradle.properties | head -n 1)"
+          if [[ -z "$VERSION" ]]; then
+            echo 'mod_version is missing from gradle.properties' >&2
+            exit 1
+          fi
+
+          TAG="v${VERSION}"
+          JAR="build/libs/sololeveling-${VERSION}.jar"
+          CHECKSUM="${JAR}.sha256"
+
+          test -f "$JAR"
+          unzip -t "$JAR"
+          sha256sum "$JAR" > "$CHECKSUM"
+
+          {
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "jar=$JAR"
+            echo "checksum=$CHECKSUM"
+          } >> "$GITHUB_OUTPUT"
+
+          cat > release-notes.md <<EOF
+          ## Solo Leveling: The Player ${VERSION}
+
+          Development prerelease for **Minecraft Java 1.20.1**, **Forge 47.4.10+**, and **Java 17**.
+
+          ### Included
+
+          - Hunter progression, stats, mana, ranks, jobs, titles, and persistent player data
+          - System HUD and menus
+          - Server-authoritative abilities and cooldowns
+          - Quests and progression flows
+          - Shadow extraction, storage, summoning, AI, and Shadow Exchange
+          - Equipment, sets, upgrades, rewards, and signature items
+          - Gates, dungeon sessions, enemies, elites, objectives, and bosses
+          - Original generated models, textures, GUI assets, sounds, and particles
+
+          ### Install
+
+          Place `sololeveling-${VERSION}.jar` in the Forge 1.20.1 instance's `mods` folder.
+
+          This remains a prerelease pending full client, dedicated-server, multiplayer, persistence, balance, stress, and visual acceptance testing. See `CHANGELOG.md` and `INTEGRATION_STATUS.md` in the repository for details.
+          EOF
+
+      - name: Create or refresh GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+          VERSION: ${{ steps.release.outputs.version }}
+          JAR: ${{ steps.release.outputs.jar }}
+          CHECKSUM: ${{ steps.release.outputs.checksum }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TITLE="Solo Leveling: The Player v${VERSION}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$JAR" "$CHECKSUM" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --prerelease
+          else
+            gh release create "$TAG" "$JAR" "$CHECKSUM" \
+              --target "$GITHUB_SHA" \
+              --title "$TITLE" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
