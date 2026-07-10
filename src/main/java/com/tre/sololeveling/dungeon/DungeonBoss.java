@@ -27,6 +27,8 @@ import java.util.UUID;
 public final class DungeonBoss {
     public enum TickResult { ALIVE, MISSING }
 
+    private static final String TAG_PHASE_TWO = "sl_boss_phase_two";
+    private static final String TAG_PHASE_ADDS = "sl_boss_phase_adds";
     private static final Map<UUID, BossRuntime> RUNTIMES = new HashMap<>();
 
     public static LivingEntity spawn(ServerLevel level, DungeonSession session, DungeonTypes.GateRank rank) {
@@ -43,13 +45,13 @@ public final class DungeonBoss {
         boolean subway = "abandoned_subway".equals(session.templateId());
         String bossName = subway ? "Subway Warden" : "Iron Sovereign";
         double scale = Math.max(1.0D, rank.rewardMultiplier() * 0.72D);
-        double baseHealth = subway ? 240.0D : 520.0D;
-        double baseDamage = subway ? 11.0D : 18.0D;
+        double baseHealth = subway ? 180.0D : 520.0D;
+        double baseDamage = subway ? 8.5D : 18.0D;
         set(boss, Attributes.MAX_HEALTH, baseHealth * scale);
         set(boss, Attributes.ATTACK_DAMAGE, baseDamage * Math.max(1.0D, scale * 0.65D));
-        set(boss, Attributes.MOVEMENT_SPEED, subway ? 0.28D : 0.31D);
-        set(boss, Attributes.ARMOR, subway ? 10.0D : 18.0D);
-        set(boss, Attributes.KNOCKBACK_RESISTANCE, 0.8D);
+        set(boss, Attributes.MOVEMENT_SPEED, subway ? 0.27D : 0.31D);
+        set(boss, Attributes.ARMOR, subway ? 6.0D : 18.0D);
+        set(boss, Attributes.KNOCKBACK_RESISTANCE, subway ? 0.65D : 0.8D);
         boss.setHealth(boss.getMaxHealth());
         boss.setCustomName(Component.literal(bossName));
         boss.setCustomNameVisible(true);
@@ -59,6 +61,8 @@ public final class DungeonBoss {
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_SHADOW_EXTRACTABLE, true);
         boss.getPersistentData().putUUID(DungeonTypes.TAG_SESSION, session.sessionId());
         boss.getPersistentData().putString(DungeonTypes.TAG_ENEMY_ID, subway ? "subway_warden" : "iron_sovereign");
+        boss.getPersistentData().putBoolean(TAG_PHASE_TWO, false);
+        boss.getPersistentData().putBoolean(TAG_PHASE_ADDS, false);
         if (!level.addFreshEntity(boss)) return null;
         session.enemySpawned(boss.getUUID());
         session.setBossId(boss.getUUID());
@@ -80,14 +84,18 @@ public final class DungeonBoss {
         return TickResult.ALIVE;
     }
 
-    public static boolean isBoss(LivingEntity entity) { return entity.getPersistentData().getBoolean(DungeonTypes.TAG_BOSS); }
+    public static boolean isBoss(LivingEntity entity) {
+        return entity.getPersistentData().getBoolean(DungeonTypes.TAG_BOSS);
+    }
 
     public static void remove(DungeonSession session) {
         BossRuntime runtime = RUNTIMES.remove(session.sessionId());
         if (runtime != null) runtime.bar.removeAllPlayers();
     }
 
-    public static void onDeath(DungeonSession session) { remove(session); }
+    public static void onDeath(DungeonSession session) {
+        remove(session);
+    }
 
     private static final class BossRuntime {
         private final ServerBossEvent bar;
@@ -100,6 +108,8 @@ public final class DungeonBoss {
             bar.setDarkenScreen(true);
             bar.setVisible(true);
             bar.setProgress(Math.max(0.0F, boss.getHealth() / boss.getMaxHealth()));
+            phaseTwo = boss.getPersistentData().getBoolean(TAG_PHASE_TWO);
+            phaseAddsSpawned = boss.getPersistentData().getBoolean(TAG_PHASE_ADDS);
         }
 
         private void tick(MinecraftServer server, ServerLevel level, DungeonSession session, Ravager boss, DungeonTypes.GateRank rank) {
@@ -118,6 +128,7 @@ public final class DungeonBoss {
         private void enterPhaseTwo(MinecraftServer server, ServerLevel level, DungeonSession session,
                                    Ravager boss, DungeonTypes.GateRank rank) {
             phaseTwo = true;
+            boss.getPersistentData().putBoolean(TAG_PHASE_TWO, true);
             boss.setGlowingTag(true);
             level.playSound(null, boss.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 2.0F, 0.65F);
             level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, 1.35F);
@@ -132,30 +143,30 @@ public final class DungeonBoss {
             }
             if (!phaseAddsSpawned) {
                 phaseAddsSpawned = true;
+                boss.getPersistentData().putBoolean(TAG_PHASE_ADDS, true);
                 BlockPos center = DungeonArena.bossCenter(session);
                 DungeonEnemies.spawn(level, session, "steel_fang_raider", center.offset(7, 0, 0), rank, false);
                 DungeonEnemies.spawn(level, session, "steel_fang_raider", center.offset(-7, 0, 0), rank, false);
-                DungeonEnemies.spawn(level, session, "dungeon_archer", center.offset(0, 0, -7), rank, false);
             }
         }
 
         private void phaseOne(ServerLevel level, DungeonSession session, Ravager boss, DungeonTypes.GateRank rank) {
             float scale = damageScale(rank);
-            int cycle = ticks % 100;
-            if (cycle == 70) telegraphRing(level, boss, 6.0D, ParticleTypes.WITCH);
-            if (cycle == 80) cleave(level, session, boss, 6.0D, 8.0F * scale);
-            if (ticks % 140 == 115) telegraphRing(level, boss, 9.0D, ParticleTypes.CRIT);
-            if (ticks % 140 == 130) stomp(level, session, boss, 9.0D, 7.0F * scale, 1.1D);
+            int cycle = ticks % 110;
+            if (cycle == 78) telegraphRing(level, boss, 6.0D, ParticleTypes.WITCH);
+            if (cycle == 90) cleave(level, session, boss, 6.0D, 6.0F * scale);
+            if (ticks % 160 == 125) telegraphRing(level, boss, 9.0D, ParticleTypes.CRIT);
+            if (ticks % 160 == 142) stomp(level, session, boss, 9.0D, 5.0F * scale, 0.9D);
         }
 
         private void phaseTwo(ServerLevel level, DungeonSession session, Ravager boss, DungeonTypes.GateRank rank) {
             float scale = damageScale(rank);
-            int blastCycle = ticks % 72;
-            if (blastCycle == 52) telegraphLine(level, boss);
-            if (blastCycle == 64) sovereignBlast(level, session, boss, 11.0F * scale);
-            int roarCycle = ticks % 110;
-            if (roarCycle == 80) telegraphRing(level, boss, 12.0D, ParticleTypes.SOUL_FIRE_FLAME);
-            if (roarCycle == 95) stomp(level, session, boss, 12.0D, 10.0F * scale, 1.45D);
+            int blastCycle = ticks % 88;
+            if (blastCycle == 62) telegraphLine(level, boss);
+            if (blastCycle == 76) sovereignBlast(level, session, boss, 7.0F * scale);
+            int roarCycle = ticks % 130;
+            if (roarCycle == 94) telegraphRing(level, boss, 11.0D, ParticleTypes.SOUL_FIRE_FLAME);
+            if (roarCycle == 112) stomp(level, session, boss, 11.0D, 7.0F * scale, 1.15D);
         }
     }
 
@@ -166,24 +177,28 @@ public final class DungeonBoss {
     private static void cleave(ServerLevel level, DungeonSession session, Ravager boss, double radius, float damage) {
         level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ATTACK, SoundSource.HOSTILE, 1.5F, 0.8F);
         Vec3 look = horizontalLook(boss);
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius))) {
+        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius),
+                player -> session.contains(player.getUUID()))) {
             Vec3 direction = player.position().subtract(boss.position());
             if (!validVictim(session, boss, player, radius)
                     || direction.lengthSqr() > 0.01D && look.dot(direction.normalize()) < 0.15D) continue;
             player.hurt(level.damageSources().mobAttack(boss), damage);
             knock(player, boss.position(), 0.8D);
         }
-        level.sendParticles(ParticleTypes.SWEEP_ATTACK, boss.getX(), boss.getY() + 1.0D, boss.getZ(), 24, radius * 0.4D, 0.5D, radius * 0.4D, 0.01D);
+        level.sendParticles(ParticleTypes.SWEEP_ATTACK, boss.getX(), boss.getY() + 1.0D, boss.getZ(), 24,
+                radius * 0.4D, 0.5D, radius * 0.4D, 0.01D);
     }
 
     private static void stomp(ServerLevel level, DungeonSession session, Ravager boss, double radius, float damage, double force) {
         level.playSound(null, boss.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.HOSTILE, 1.6F, 0.9F);
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius))) {
+        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(radius),
+                player -> session.contains(player.getUUID()))) {
             if (!validVictim(session, boss, player, radius)) continue;
             player.hurt(level.damageSources().mobAttack(boss), damage);
             knock(player, boss.position(), force);
         }
-        level.sendParticles(ParticleTypes.POOF, boss.getX(), boss.getY(), boss.getZ(), 70, radius * 0.45D, 0.3D, radius * 0.45D, 0.08D);
+        level.sendParticles(ParticleTypes.POOF, boss.getX(), boss.getY(), boss.getZ(), 70,
+                radius * 0.45D, 0.3D, radius * 0.45D, 0.08D);
     }
 
     private static void sovereignBlast(ServerLevel level, DungeonSession session, Ravager boss, float damage) {
@@ -193,7 +208,8 @@ public final class DungeonBoss {
             Vec3 point = boss.position().add(look.scale(i)).add(0.0D, 1.0D, 0.0D);
             level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, point.x, point.y, point.z, 5, 0.35D, 0.35D, 0.35D, 0.02D);
         }
-        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(18.0D))) {
+        for (ServerPlayer player : level.getEntitiesOfClass(ServerPlayer.class, boss.getBoundingBox().inflate(18.0D),
+                player -> session.contains(player.getUUID()))) {
             Vec3 toPlayer = player.position().subtract(boss.position());
             if (validVictim(session, boss, player, 18.0D)
                     && toPlayer.lengthSqr() > 0.01D && look.dot(toPlayer.normalize()) > 0.78D) {
@@ -214,10 +230,12 @@ public final class DungeonBoss {
         return horizontal.lengthSqr() < 1.0E-6D ? new Vec3(0.0D, 0.0D, 1.0D) : horizontal.normalize();
     }
 
-    private static void telegraphRing(ServerLevel level, Ravager boss, double radius, net.minecraft.core.particles.SimpleParticleType particle) {
+    private static void telegraphRing(ServerLevel level, Ravager boss, double radius,
+                                      net.minecraft.core.particles.SimpleParticleType particle) {
         for (int i = 0; i < 48; i++) {
             double angle = Math.PI * 2.0D * i / 48.0D;
-            level.sendParticles(particle, boss.getX() + Math.cos(angle) * radius, boss.getY() + 0.15D, boss.getZ() + Math.sin(angle) * radius,
+            level.sendParticles(particle, boss.getX() + Math.cos(angle) * radius,
+                    boss.getY() + 0.15D, boss.getZ() + Math.sin(angle) * radius,
                     1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
         level.playSound(null, boss.blockPosition(), SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.HOSTILE, 1.0F, 0.55F);
