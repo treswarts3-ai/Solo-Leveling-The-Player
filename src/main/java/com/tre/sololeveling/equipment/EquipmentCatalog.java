@@ -49,18 +49,18 @@ public final class EquipmentCatalog {
                 StatBonus.of(STRENGTH, 20), StatBonus.of(AGILITY, 14), StatBonus.scaling(ATTACK_DAMAGE, 0, 1.25));
 
         armor("novice_hunter_hood", UNCOMMON, HEAD, "novice_hunter", 5, "crafted",
-                StatBonus.of(STAMINA, 1), StatBonus.scaling(ARMOR, 0, 0.15));
+                StatBonus.of(STAMINA, 1), StatBonus.scaling(EquipmentStat.ARMOR, 0, 0.15));
         armor("novice_hunter_jacket", UNCOMMON, CHEST, "novice_hunter", 5, "crafted",
-                StatBonus.of(STAMINA, 2), StatBonus.scaling(ARMOR, 0, 0.20));
+                StatBonus.of(STAMINA, 2), StatBonus.scaling(EquipmentStat.ARMOR, 0, 0.20));
         armor("novice_hunter_leggings", UNCOMMON, LEGS, "novice_hunter", 5, "crafted",
-                StatBonus.of(AGILITY, 1), StatBonus.scaling(ARMOR, 0, 0.18));
+                StatBonus.of(AGILITY, 1), StatBonus.scaling(EquipmentStat.ARMOR, 0, 0.18));
         armor("novice_hunter_boots", UNCOMMON, FEET, "novice_hunter", 5, "crafted",
                 StatBonus.of(AGILITY, 2), StatBonus.scaling(MOVEMENT_SPEED, 0, 0.001));
 
         armorSet("high_knight", RARE, 8, "mid_rank_dungeon",
                 new String[]{"high_knight_helmet", "high_knight_chestplate", "high_knight_leggings", "high_knight_boots"},
                 new EquipmentSlotType[]{HEAD, CHEST, LEGS, FEET},
-                new StatBonus[]{StatBonus.of(STAMINA, 3), StatBonus.scaling(ARMOR, 0, 0.20)});
+                new StatBonus[]{StatBonus.of(STAMINA, 3), StatBonus.scaling(EquipmentStat.ARMOR, 0, 0.20)});
         armorSet("assassins", RARE, 8, "mid_rank_dungeon",
                 new String[]{"assassins_hood", "assassins_jacket", "assassins_trousers", "assassins_shoes"},
                 new EquipmentSlotType[]{HEAD, CHEST, LEGS, FEET},
@@ -113,7 +113,7 @@ public final class EquipmentCatalog {
 
         set("novice_hunter",
                 Set.of("novice_hunter_hood", "novice_hunter_jacket", "novice_hunter_leggings", "novice_hunter_boots"),
-                List.of(StatBonus.of(MAX_HEALTH, 4), StatBonus.of(ARMOR, 2)), "novice_resolve");
+                List.of(StatBonus.of(MAX_HEALTH, 4), StatBonus.of(EquipmentStat.ARMOR, 2)), "novice_resolve");
         set("high_knight",
                 Set.of("high_knight_helmet", "high_knight_chestplate", "high_knight_leggings", "high_knight_boots", "high_knight_gauntlets"),
                 List.of(StatBonus.of(STAMINA, 8)), "fortress");
@@ -138,7 +138,7 @@ public final class EquipmentCatalog {
 
     private static void armor(String id, EquipmentRarity rarity, EquipmentSlotType slot, String setId,
                               int maxUpgrade, String acquisition, StatBonus... bonuses) {
-        define(new EquipmentDefinition(id, rarity, ARMOR, slot, AccessorySlot.NONE, List.of(bonuses), setId, maxUpgrade, "", acquisition));
+        define(new EquipmentDefinition(id, rarity, EquipmentCategory.ARMOR, slot, AccessorySlot.NONE, List.of(bonuses), setId, maxUpgrade, "", acquisition));
     }
 
     private static void armorSet(String setId, EquipmentRarity rarity, int maxUpgrade, String acquisition,
@@ -150,7 +150,7 @@ public final class EquipmentCatalog {
 
     private static void accessory(String id, EquipmentRarity rarity, AccessorySlot slot, String setId,
                                   int maxUpgrade, String acquisition, StatBonus... bonuses) {
-        define(new EquipmentDefinition(id, rarity, ACCESSORY, EquipmentSlotType.ACCESSORY, slot, List.of(bonuses), setId, maxUpgrade, "", acquisition));
+        define(new EquipmentDefinition(id, rarity, EquipmentCategory.ACCESSORY, EquipmentSlotType.ACCESSORY, slot, List.of(bonuses), setId, maxUpgrade, "", acquisition));
     }
 
     private static void set(String id, Set<String> required, List<StatBonus> bonuses, String hook) {
