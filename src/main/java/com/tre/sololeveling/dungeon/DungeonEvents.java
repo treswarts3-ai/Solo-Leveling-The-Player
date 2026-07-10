@@ -110,6 +110,7 @@ public final class DungeonEvents {
         if (server != null) {
             animateGates(server);
             DungeonRuntime.tick(server);
+            synchronizeDungeonDoors(server);
         }
     }
 
@@ -133,9 +134,7 @@ public final class DungeonEvents {
             }
 
             DungeonRuntime.Result started = DungeonRuntime.start(player);
-            if (!started.success()) {
-                player.sendSystemMessage(Component.literal("[DUNGEON] " + started.message()).withStyle(ChatFormatting.RED));
-            }
+            if (!started.success()) player.sendSystemMessage(Component.literal("[DUNGEON] " + started.message()).withStyle(ChatFormatting.RED));
             return;
         }
     }
@@ -150,8 +149,21 @@ public final class DungeonEvents {
             BlockPos base = gate.position();
             level.sendParticles(ParticleTypes.PORTAL, base.getX() + 0.5D, base.getY() + 2.2D, base.getZ() + 0.5D,
                     12, 1.05D, 1.35D, 0.18D, 0.08D);
+            level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
+                    6, 0.9D, 1.25D, 0.12D, 0.015D);
             level.sendParticles(ParticleTypes.REVERSE_PORTAL, base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
                     3, 0.7D, 1.1D, 0.12D, 0.02D);
+        }
+    }
+
+    private static void synchronizeDungeonDoors(MinecraftServer server) {
+        if (server.overworld().getGameTime() % 10L != 0L) return;
+        for (DungeonSession session : DungeonSavedData.get(server).sessions().values()) {
+            if (session.isTerminal() || !session.arenaBuilt()) continue;
+            ServerLevel level = server.getLevel(session.dungeonDimension());
+            if (level == null) continue;
+            int opened = Math.min(3, session.objectiveIndex());
+            for (int objective = 0; objective < opened; objective++) DungeonArena.openCheckpoint(level, session, objective);
         }
     }
 
