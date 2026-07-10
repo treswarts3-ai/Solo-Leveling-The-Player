@@ -6,12 +6,18 @@ on:
       - worker5-transfer
     paths:
       - '.github/workflows/worker5-transfer.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/worker5-transfer.yml'
 
 permissions:
   contents: write
 
 jobs:
   apply-and-validate:
+    if: github.event_name == 'push' || github.head_ref == 'worker5-transfer'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -19,6 +25,7 @@ jobs:
       - name: Checkout transfer payload
         uses: actions/checkout@v4
         with:
+          ref: worker5-transfer
           fetch-depth: 0
 
       - name: Set up Java 17
