@@ -1,1 +1,1 @@
-Trigger archive diagnostics pass 2.
+Trigger verified organized source import after corrected archive staging.
