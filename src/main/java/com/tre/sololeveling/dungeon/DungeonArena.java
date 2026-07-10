@@ -119,6 +119,7 @@ public final class DungeonArena {
     }
 
     public static void discardSessionEntities(ServerLevel level, DungeonSession session) {
+        loadArenaChunks(level, session);
         for (Entity entity : level.getEntities((Entity)null, bounds(session), entity ->
                 entity.getPersistentData().hasUUID(DungeonTypes.TAG_SESSION)
                         && session.sessionId().equals(entity.getPersistentData().getUUID(DungeonTypes.TAG_SESSION)))) {
@@ -126,6 +127,17 @@ public final class DungeonArena {
         }
         session.trackedEntities().clear();
         session.setLiveEnemyCount(0);
+    }
+
+    private static void loadArenaChunks(ServerLevel level, DungeonSession session) {
+        BlockPos origin = session.arenaOrigin();
+        int minChunkX = (origin.getX() - RADIUS - 2) >> 4;
+        int maxChunkX = (origin.getX() + RADIUS + 2) >> 4;
+        int minChunkZ = (origin.getZ() - RADIUS - 2) >> 4;
+        int maxChunkZ = (origin.getZ() + RADIUS + 2) >> 4;
+        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) level.getChunk(chunkX, chunkZ);
+        }
     }
 
     private DungeonArena() {}
