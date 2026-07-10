@@ -1,0 +1,121 @@
+name: Apply growth-choice UI
+
+on:
+  push:
+    branches:
+      - feature/creative-progression
+    paths:
+      - '.github/workflows/apply-growth-choice-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/creative-progression
+          fetch-depth: 0
+
+      - name: Patch command registration and Stats UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          common = Path('src/main/java/com/tre/sololeveling/event/CommonEvents.java')
+          text = common.read_text(encoding='utf-8')
+          text = text.replace(
+              'import com.tre.sololeveling.command.SoloLevelingCommands;\n',
+              'import com.tre.sololeveling.command.ProgressionChoiceCommands;\nimport com.tre.sololeveling.command.SoloLevelingCommands;\n',
+              1,
+          )
+          text = text.replace(
+              '    public void commands(RegisterCommandsEvent event) { SoloLevelingCommands.register(event.getDispatcher()); }',
+              '    public void commands(RegisterCommandsEvent event) {\n        SoloLevelingCommands.register(event.getDispatcher());\n        ProgressionChoiceCommands.register(event.getDispatcher());\n    }',
+              1,
+          )
+          common.write_text(text, encoding='utf-8')
+
+          screen = Path('src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java')
+          text = screen.read_text(encoding='utf-8')
+
+          old_stats = '''    private void addStatsButtons() {
+              for (int i = 0; i < STATS.length; i++) {
+                  String stat = STATS[i];
+                  int y = contentY + 18 + i * statRowStep();
+                  Button button = Button.builder(Component.literal("+"), ignored -> send("ALLOCATE:" + stat))
+                          .bounds(contentX + contentWidth - 22, y - 3, 18, 16).build();
+                  actionButtons.put("stat:" + stat, button);
+                  addRenderableWidget(button);
+              }
+          }
+          '''
+          new_stats = '''    private void addStatsButtons() {
+              for (int i = 0; i < STATS.length; i++) {
+                  String stat = STATS[i];
+                  int y = contentY + 18 + i * statRowStep();
+                  Button button = Button.builder(Component.literal("+"), ignored -> send("ALLOCATE:" + stat))
+                          .bounds(contentX + contentWidth - 22, y - 3, 18, 16).build();
+                  actionButtons.put("stat:" + stat, button);
+                  addRenderableWidget(button);
+              }
+              int y = contentY + contentHeight - 18;
+              int width = Math.max(52, (contentWidth - 8) / 3);
+              addGrowthButton("VANGUARD", "vanguard", contentX, y, width);
+              addGrowthButton("PHANTOM", "phantom", contentX + width + 4, y, width);
+              addGrowthButton("ARCANE", "arcane", contentX + (width + 4) * 2, y, width);
+          }
+
+          private void addGrowthButton(String label, String choice, int x, int y, int width) {
+              Button button = Button.builder(Component.literal(label), ignored -> send("GROWTH_CHOICE:" + choice))
+                      .bounds(x, y, width, 16).build();
+              actionButtons.put("growth:" + choice, button);
+              addRenderableWidget(button);
+          }
+          '''
+          if old_stats not in text:
+              raise SystemExit('Stats button method not found')
+          text = text.replace(old_stats, new_stats, 1)
+
+          anchor = '''        Button claim = actionButtons.get("claim_daily");
+              if (claim != null) claim.active = data.dailyComplete() && !data.dailyClaimed();
+          '''
+          replacement = anchor + '''        boolean growthPending = data.raw().getInt("pending_growth_choices") > 0;
+              setActive("growth:vanguard", growthPending);
+              setActive("growth:phantom", growthPending);
+              setActive("growth:arcane", growthPending);
+          '''
+          if anchor not in text:
+              raise SystemExit('Refresh anchor not found')
+          text = text.replace(anchor, replacement, 1)
+
+          render_anchor = '''        if (contentHeight >= 150) {
+                  graphics.drawString(font, "Mana " + data.mana() + " / " + data.maxMana(), contentX, contentY + 129, SystemUi.Theme.VIOLET, false);
+                  graphics.drawString(font, "Job: " + data.text("job", "None") + "   Title: " + data.text("title", "The Player"), contentX, contentY + 143, SystemUi.Theme.TEXT_DIM, false);
+              }
+          '''
+          render_replacement = render_anchor + '''        int pending = data.raw().getInt("pending_growth_choices");
+              String growth = pending > 0
+                      ? "GROWTH CHOICE PENDING: " + pending
+                      : "Build  V:" + data.raw().getInt("growth_vanguard") + "  P:" + data.raw().getInt("growth_phantom") + "  A:" + data.raw().getInt("growth_arcane");
+              graphics.drawString(font, growth, contentX, contentY + contentHeight - 31,
+                      pending > 0 ? SystemUi.Theme.WARNING : SystemUi.Theme.TEXT_DIM, false);
+          '''
+          if render_anchor not in text:
+              raise SystemExit('Stats rendering anchor not found')
+          text = text.replace(render_anchor, render_replacement, 1)
+          screen.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit patch and remove one-use workflow
+        shell: bash
+        run: |
+          rm .github/workflows/apply-growth-choice-ui.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/main/java/com/tre/sololeveling/event/CommonEvents.java src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java .github/workflows/apply-growth-choice-ui.yml
+          git commit -m 'Expose growth choices in the System Stats screen'
+          git push origin HEAD:feature/creative-progression
