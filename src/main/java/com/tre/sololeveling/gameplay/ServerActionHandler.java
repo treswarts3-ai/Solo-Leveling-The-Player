@@ -31,6 +31,7 @@ public final class ServerActionHandler {
         if (action.equals("TOGGLE_HUD")) { HunterData.toggleHud(player); return; }
         if (action.startsWith("ALLOCATE:")) { HunterData.allocate(player, action.substring(9), 1); return; }
         if (action.startsWith("ALLOCATE5:")) { HunterData.allocate(player, action.substring(10), 5); return; }
+        if (action.startsWith("GROWTH_CHOICE:")) { ProgressionChoiceHandler.choose(player, action.substring(14)); return; }
         if (action.startsWith("ABILITY:")) {
             String skill = action.substring(8).toLowerCase(java.util.Locale.ROOT);
             int manaBefore = HunterData.getMana(player);
