@@ -1,5 +1,6 @@
 package com.tre.sololeveling.event;
 
+import com.tre.sololeveling.command.ProgressionChoiceCommands;
 import com.tre.sololeveling.command.SoloLevelingCommands;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.data.HunterData;
@@ -31,7 +32,10 @@ import net.minecraftforge.fml.LogicalSide;
 
 public final class CommonEvents {
     @SubscribeEvent
-    public void commands(RegisterCommandsEvent event) { SoloLevelingCommands.register(event.getDispatcher()); }
+    public void commands(RegisterCommandsEvent event) {
+        SoloLevelingCommands.register(event.getDispatcher());
+        ProgressionChoiceCommands.register(event.getDispatcher());
+    }
 
     @SubscribeEvent
     public void playerTick(TickEvent.PlayerTickEvent event) {
