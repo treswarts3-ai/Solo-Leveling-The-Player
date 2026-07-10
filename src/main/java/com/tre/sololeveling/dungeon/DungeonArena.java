@@ -101,9 +101,15 @@ public final class DungeonArena {
         for (int x = -2; x <= 2; x++) {
             for (int y = 0; y <= 4; y++) {
                 boolean frame = x == -2 || x == 2 || y == 0 || y == 4;
-                level.setBlock(base.offset(x, y, 0), frame ? Blocks.CRYING_OBSIDIAN.defaultBlockState() : Blocks.PURPLE_STAINED_GLASS.defaultBlockState(), 3);
+                level.setBlock(base.offset(x, y, 0), frame ? Blocks.CRYING_OBSIDIAN.defaultBlockState() : Blocks.AIR.defaultBlockState(), 3);
             }
         }
+    }
+
+    public static AABB gateTrigger(DungeonTypes.GateDefinition gate) {
+        BlockPos base = gate.position();
+        return new AABB(base.getX() - 1.15D, base.getY() + 0.5D, base.getZ() - 0.75D,
+                base.getX() + 2.15D, base.getY() + 4.0D, base.getZ() + 1.75D);
     }
 
     public static void removeGateMarker(ServerLevel level, DungeonTypes.GateDefinition gate) {
