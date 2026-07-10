@@ -27,6 +27,7 @@ public final class DungeonSession {
     private final Map<UUID, DungeonTypes.ReturnPoint> returnPoints = new LinkedHashMap<>();
     private final Set<UUID> trackedEntities = new LinkedHashSet<>();
     private final Set<UUID> rewardedMembers = new LinkedHashSet<>();
+    private boolean rewardDistributionStarted;
     private ResourceKey<Level> dungeonDimension = Level.OVERWORLD;
     private BlockPos arenaOrigin = BlockPos.ZERO;
     private DungeonTypes.SessionState state = DungeonTypes.SessionState.WAITING;
@@ -79,8 +80,9 @@ public final class DungeonSession {
     public long cleanupAfterGameTime() { return cleanupAfterGameTime; }
     public boolean arenaBuilt() { return arenaBuilt; }
     public boolean encounterSpawned() { return encounterSpawned; }
-    public boolean rewardGranted() { return rewardedMembers.containsAll(members); }
+    public boolean rewardGranted() { return rewardDistributionStarted; }
     public boolean rewardGrantedTo(UUID playerId) { return rewardedMembers.contains(playerId); }
+    public int rewardedMemberCount() { return rewardedMembers.size(); }
     public boolean rewardRoomCreated() { return rewardRoomCreated; }
     public UUID bossId() { return bossId; }
     public String failureReason() { return failureReason; }
@@ -105,7 +107,7 @@ public final class DungeonSession {
     public void setArenaBuilt(boolean value) { arenaBuilt = value; }
     public void setEncounterSpawned(boolean value) { encounterSpawned = value; }
     public boolean markRewardGranted(UUID playerId) { return members.contains(playerId) && rewardedMembers.add(playerId); }
-    public void setRewardGranted(boolean value) { if (value) rewardedMembers.addAll(members); else rewardedMembers.clear(); }
+    public void setRewardGranted(boolean value) { rewardDistributionStarted = value; if (!value) rewardedMembers.clear(); }
     public void setRewardRoomCreated(boolean value) { rewardRoomCreated = value; }
     public void setBossId(UUID value) { bossId = value; }
     public void setFailureReason(String value) { failureReason = value == null ? "" : value; }
@@ -131,7 +133,7 @@ public final class DungeonSession {
         tag.putLong("cleanup_after", cleanupAfterGameTime);
         tag.putBoolean("arena_built", arenaBuilt);
         tag.putBoolean("encounter_spawned", encounterSpawned);
-        tag.putBoolean("reward_granted", rewardGranted());
+        tag.putBoolean("reward_granted", rewardDistributionStarted);
         tag.putBoolean("reward_room_created", rewardRoomCreated);
         tag.putString("failure_reason", failureReason);
         if (bossId != null) tag.putUUID("boss_id", bossId);
@@ -180,9 +182,10 @@ public final class DungeonSession {
             session.returnPoints.put(entry.getKey(), entry.getValue());
         }
         session.trackedEntities.addAll(uuidList(tag.getList("tracked_entities", Tag.TAG_STRING)));
+        session.rewardDistributionStarted = tag.getBoolean("reward_granted");
         if (tag.contains("rewarded_members", Tag.TAG_LIST)) {
             session.rewardedMembers.addAll(uuidList(tag.getList("rewarded_members", Tag.TAG_STRING)));
-        } else if (tag.getBoolean("reward_granted")) {
+        } else if (session.rewardDistributionStarted) {
             session.rewardedMembers.addAll(session.members);
         }
         return session;
