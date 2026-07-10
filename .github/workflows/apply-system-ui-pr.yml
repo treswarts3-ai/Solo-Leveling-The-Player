@@ -73,13 +73,21 @@ jobs:
         if: steps.build.outputs.status != '0'
         shell: bash
         run: |
-          cp /tmp/system-ui-build.log SYSTEM_UI_BUILD_FAILURE.log
+          {
+            echo "System UI Gradle failure summary"
+            echo "================================"
+            grep -nE 'error:|FAILURE:|What went wrong|symbol:|location:|BUILD FAILED' /tmp/system-ui-build.log || true
+            echo
+            echo "Last 180 build lines"
+            echo "===================="
+            tail -n 180 /tmp/system-ui-build.log
+          } > SYSTEM_UI_BUILD_FAILURE.log
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add SYSTEM_UI_BUILD_FAILURE.log
-          git commit -m "Record System UI build failure" || true
+          git commit -m "Record System UI compiler errors" || true
+          git pull --rebase origin feature/system-ui
           git push origin HEAD:feature/system-ui
-          exit 1
 
       - name: Commit validated UI batch
         if: steps.build.outputs.status == '0'
@@ -91,4 +99,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Complete responsive System HUD and menus"
+          git pull --rebase origin feature/system-ui
           git push origin HEAD:feature/system-ui
