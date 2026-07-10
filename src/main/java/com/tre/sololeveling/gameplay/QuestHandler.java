@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.monster.Husk;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -36,7 +37,7 @@ public final class QuestHandler {
         CompoundTag tag = HunterData.mutable(player);
         if (!HunterData.isAwakened(player)) return;
         ProgressionHandler.tick(player);
-        resetActivityDailyIfNeeded(tag);
+        resetActivityDailyIfNeeded(player, tag);
 
         if (tag.getBoolean("penalty_pending") && !tag.getBoolean("penalty_active") && player.tickCount % 100 == 0) {
             tag.putBoolean("penalty_pending", false);
@@ -59,34 +60,53 @@ public final class QuestHandler {
         }
     }
 
-    private static void resetActivityDailyIfNeeded(CompoundTag tag) {
+    private static void resetActivityDailyIfNeeded(ServerPlayer player, CompoundTag tag) {
         String today = LocalDate.now(ZoneOffset.UTC).toString();
         if (today.equals(tag.getString("activity_daily_date"))) return;
         tag.putString("activity_daily_date", today);
         tag.putInt("daily_attacks", 0);
         tag.putInt("daily_jumps", 0);
         tag.putInt("daily_abilities", 0);
-        tag.putBoolean("daily_was_grounded", false);
-        tag.putLong("daily_last_jump", 0L);
+        tag.putDouble("daily_run_precise", 0.0D);
+        tag.putBoolean("daily_was_grounded", player.onGround());
+        tag.putLong("daily_last_jump", Long.MIN_VALUE / 4L);
+        tag.putLong("daily_last_attack_tick", Long.MIN_VALUE / 4L);
+        tag.putLong("daily_last_ability_tick", Long.MIN_VALUE / 4L);
+        tag.putDouble("daily_last_x", player.getX());
+        tag.putDouble("daily_last_y", player.getY());
+        tag.putDouble("daily_last_z", player.getZ());
+        tag.putString("daily_last_dimension", player.level().dimension().location().toString());
     }
 
     private static void trackMovement(ServerPlayer player, CompoundTag tag) {
         double x = player.getX();
+        double y = player.getY();
         double z = player.getZ();
-        if (tag.contains("last_x") && player.isSprinting() && player.onGround()) {
-            double dx = x - tag.getDouble("last_x");
-            double dz = z - tag.getDouble("last_z");
+        String dimension = player.level().dimension().location().toString();
+        boolean sameDimension = dimension.equals(tag.getString("daily_last_dimension"));
+
+        if (sameDimension && tag.contains("daily_last_x") && player.isSprinting() && player.onGround()) {
+            double dx = x - tag.getDouble("daily_last_x");
+            double dy = y - tag.getDouble("daily_last_y");
+            double dz = z - tag.getDouble("daily_last_z");
             double distance = Math.sqrt(dx * dx + dz * dz);
-            if (distance < 8.0D) tag.putDouble("daily_run_precise", tag.getDouble("daily_run_precise") + distance);
-            tag.putInt("daily_run", (int)Math.min(DAILY_RUN, tag.getDouble("daily_run_precise")));
+            if (distance > 0.01D && distance <= 1.5D && Math.abs(dy) <= 1.25D) {
+                double precise = Math.min(DAILY_RUN, tag.getDouble("daily_run_precise") + distance);
+                tag.putDouble("daily_run_precise", precise);
+                tag.putInt("daily_run", (int)Math.min(DAILY_RUN, Math.floor(precise)));
+            }
         }
-        tag.putDouble("last_x", x);
-        tag.putDouble("last_z", z);
+
+        tag.putDouble("daily_last_x", x);
+        tag.putDouble("daily_last_y", y);
+        tag.putDouble("daily_last_z", z);
+        tag.putString("daily_last_dimension", dimension);
 
         boolean wasGrounded = tag.getBoolean("daily_was_grounded");
         boolean grounded = player.onGround();
         long now = player.level().getGameTime();
-        if (wasGrounded && !grounded && player.getDeltaMovement().y > 0.18D && now - tag.getLong("daily_last_jump") >= 8L) {
+        if (wasGrounded && !grounded && player.getDeltaMovement().y > 0.18D
+                && now - tag.getLong("daily_last_jump") >= 8L) {
             tag.putInt("daily_jumps", Math.min(DAILY_JUMPS, tag.getInt("daily_jumps") + 1));
             tag.putLong("daily_last_jump", now);
         }
@@ -97,7 +117,10 @@ public final class QuestHandler {
         if (!HunterData.isAwakened(player) || victim.getPersistentData().getBoolean("sl_shadow")) return;
         QuestApi.onKill(player, victim);
         CompoundTag tag = HunterData.mutable(player);
-        tag.putInt("daily_kills", Math.min(DAILY_KILLS, tag.getInt("daily_kills") + 1));
+        if (victim instanceof Enemy && !victim.getPersistentData().getBoolean("sl_penalty_mob")) {
+            tag.putInt("daily_kills", Math.min(DAILY_KILLS, tag.getInt("daily_kills") + 1));
+        }
+        ProgressionChoiceHandler.onRankTrialKill(player, victim);
         ProgressionHandler.onKill(player);
         checkCompletion(player);
     }
@@ -115,6 +138,9 @@ public final class QuestHandler {
     public static void onAbilityUse(ServerPlayer player) {
         if (!HunterData.isAwakened(player)) return;
         CompoundTag tag = HunterData.mutable(player);
+        long now = player.level().getGameTime();
+        if (now - tag.getLong("daily_last_ability_tick") < 10L) return;
+        tag.putLong("daily_last_ability_tick", now);
         tag.putInt("daily_abilities", Math.min(DAILY_ABILITIES, tag.getInt("daily_abilities") + 1));
         checkCompletion(player);
     }
@@ -149,7 +175,7 @@ public final class QuestHandler {
         HunterData.addXp(player, 500);
         HunterData.storeSystemItem(player, new net.minecraft.world.item.ItemStack(ModItems.BLESSED_RANDOM_BOX.get()));
         player.setHealth(player.getMaxHealth());
-        HunterData.addMana(player, HunterData.getMaxMana(player));
+        HunterData.setMana(player, HunterData.getMaxMana(player));
         player.sendSystemMessage(Component.literal("[SYSTEM] Daily rewards claimed: 3 stat points, 250 gold, 500 XP, Blessed Box.").withStyle(ChatFormatting.GOLD));
         HunterData.sync(player);
         return true;
@@ -195,7 +221,7 @@ public final class QuestHandler {
         HunterData.resetDaily(player);
         CompoundTag tag = HunterData.mutable(player);
         tag.putString("activity_daily_date", "");
-        resetActivityDailyIfNeeded(tag);
+        resetActivityDailyIfNeeded(player, tag);
         QuestManager.resetDaily(player, true);
         HunterData.sync(player);
     }
