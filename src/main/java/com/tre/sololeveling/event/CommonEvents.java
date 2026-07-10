@@ -8,6 +8,8 @@ import com.tre.sololeveling.gameplay.PassiveHandler;
 import com.tre.sololeveling.gameplay.ProgressionHandler;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.gameplay.ShadowHandler;
+import com.tre.sololeveling.quest.QuestApi;
+import com.tre.sololeveling.quest.QuestManager;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -19,6 +21,7 @@ import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.event.TickEvent;
@@ -39,12 +42,12 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public void login(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) HunterData.sync(player);
+        if (event.getEntity() instanceof ServerPlayer player) { QuestManager.onLogin(player); HunterData.sync(player); }
     }
 
     @SubscribeEvent
     public void respawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) HunterData.sync(player);
+        if (event.getEntity() instanceof ServerPlayer player) { QuestManager.onLogin(player); HunterData.sync(player); }
     }
 
     @SubscribeEvent
@@ -87,6 +90,12 @@ public final class CommonEvents {
         }
     }
 
+
+
+    @SubscribeEvent
+    public void itemPickup(EntityItemPickupEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) QuestApi.onCollected(player, event.getItem().getItem());
+    }
 
     @SubscribeEvent
     public void attack(LivingAttackEvent event) {

@@ -4,6 +4,7 @@ import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.network.packet.SyncHunterDataPacket;
 import com.tre.sololeveling.registry.ModSounds;
+import com.tre.sololeveling.quest.QuestApi;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -250,6 +251,7 @@ public final class HunterData {
         tag.putBoolean("tutorial_stat_allocated", true);
         tag.putInt("stat_points", tag.getInt("stat_points") - used);
         tag.putInt("mana", Math.min(getMaxMana(player), tag.getInt("mana") + (key.equals("intelligence") ? used * 8 : 0)));
+        QuestApi.onStatAllocated(player, key, used);
         sync(player);
         return true;
     }
@@ -264,7 +266,7 @@ public final class HunterData {
         tag.putInt("stat_points", tag.getInt("stat_points") + total); tag.putInt("mana", getMaxMana(player)); sync(player);
     }
 
-    public static boolean unlockSkill(ServerPlayer player, String skill) { String key = "skill_" + skill.toLowerCase(Locale.ROOT); CompoundTag tag = raw(player); boolean fresh = !tag.getBoolean(key); tag.putBoolean(key, true); sync(player); return fresh; }
+    public static boolean unlockSkill(ServerPlayer player, String skill) { String normalized = skill.toLowerCase(Locale.ROOT); String key = "skill_" + normalized; CompoundTag tag = raw(player); boolean fresh = !tag.getBoolean(key); tag.putBoolean(key, true); if (fresh) QuestApi.onSkillUnlocked(player, normalized); sync(player); return fresh; }
     public static void lockSkill(ServerPlayer player, String skill) { raw(player).putBoolean("skill_" + skill.toLowerCase(Locale.ROOT), false); sync(player); }
     public static boolean hasSkill(Player player, String skill) { return raw(player).getBoolean("skill_" + skill.toLowerCase(Locale.ROOT)); }
     public static boolean cooldownReady(ServerPlayer player, String skill) { return player.level().getGameTime() >= raw(player).getLong("cooldown_" + skill); }
