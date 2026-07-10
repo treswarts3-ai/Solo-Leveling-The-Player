@@ -84,6 +84,7 @@ public final class DungeonEnemies {
         if (sessionId == null) return;
         ItemEntity token = new ItemEntity(level, entity.getX(), entity.getY() + 0.25D, entity.getZ(), new ItemStack(Items.AMETHYST_SHARD));
         token.setCustomName(Component.literal("Dungeon Core"));
+        token.setPickUpDelay(32767);
         token.getPersistentData().putBoolean(DungeonTypes.TAG_COLLECTION_ITEM, true);
         token.getPersistentData().putUUID(DungeonTypes.TAG_SESSION, sessionId);
         level.addFreshEntity(token);
