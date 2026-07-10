@@ -86,19 +86,24 @@ public final class CommonEvents {
     @SubscribeEvent
     public void clone(PlayerEvent.Clone event) {
         event.getOriginal().reviveCaps();
-        if (!event.isWasDeath() || ModConfigs.PRESERVE_ON_DEATH.get()) HunterData.copy(event.getOriginal(), event.getEntity());
+        HunterData.copy(event.getOriginal(), event.getEntity());
         event.getOriginal().invalidateCaps();
     }
 
     @SubscribeEvent
     public void death(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
+        if (victim instanceof ServerPlayer deadPlayer) ProgressionChoiceHandler.onPlayerDeath(deadPlayer);
         if (victim.getPersistentData().getBoolean("sl_shadow")) return;
+
         if (event.getSource().getEntity() instanceof ServerPlayer player && victim != player) {
-            double attack = victim.getAttribute(Attributes.ATTACK_DAMAGE) == null ? 2.0D : victim.getAttributeValue(Attributes.ATTACK_DAMAGE);
-            int xp = Math.max(5, (int)(victim.getMaxHealth() * 2.0D + victim.getArmorValue() * 3.0D + attack * 4.0D));
-            if (victim.getPersistentData().getBoolean("sl_penalty_mob")) xp = 0;
-            if (xp > 0) HunterData.addXp(player, (int)Math.max(1, Math.round(xp * ModConfigs.XP_MULTIPLIER.get())));
+            boolean dungeonEnemy = victim.getPersistentData().getBoolean("sl_dungeon_enemy");
+            boolean penaltyEnemy = victim.getPersistentData().getBoolean("sl_penalty_mob");
+            if (!dungeonEnemy && !penaltyEnemy) {
+                double attack = victim.getAttribute(Attributes.ATTACK_DAMAGE) == null ? 2.0D : victim.getAttributeValue(Attributes.ATTACK_DAMAGE);
+                int xp = Math.max(5, (int)(victim.getMaxHealth() * 2.0D + victim.getArmorValue() * 3.0D + attack * 4.0D));
+                HunterData.addXp(player, (int)Math.max(1, Math.round(xp * ModConfigs.XP_MULTIPLIER.get())));
+            }
             QuestHandler.onKill(player, victim);
             ShadowHandler.recordImprint(player, victim);
         }
