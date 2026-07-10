@@ -26,6 +26,7 @@ public final class DungeonSession {
     private final Set<UUID> members = new LinkedHashSet<>();
     private final Map<UUID, DungeonTypes.ReturnPoint> returnPoints = new LinkedHashMap<>();
     private final Set<UUID> trackedEntities = new LinkedHashSet<>();
+    private final Set<UUID> rewardedMembers = new LinkedHashSet<>();
     private ResourceKey<Level> dungeonDimension = Level.OVERWORLD;
     private BlockPos arenaOrigin = BlockPos.ZERO;
     private DungeonTypes.SessionState state = DungeonTypes.SessionState.WAITING;
@@ -36,18 +37,24 @@ public final class DungeonSession {
     private int liveEnemyCount;
     private int totalSpawns;
     private final int arenaSlot;
+    private int arenaVersion;
     private long lastActiveGameTime;
     private long cleanupAfterGameTime;
     private boolean arenaBuilt;
     private boolean encounterSpawned;
-    private boolean rewardGranted;
     private boolean rewardRoomCreated;
     private UUID bossId;
     private String failureReason = "";
 
     public DungeonSession(UUID sessionId, String gateId, String templateId, UUID owner, Collection<UUID> members, int totalTimeTicks, int arenaSlot) {
-        this.sessionId = sessionId; this.gateId = DungeonTypes.id(gateId); this.templateId = DungeonTypes.id(templateId); this.owner = owner;
-        this.members.add(owner); this.members.addAll(members); this.remainingTicks = Math.max(20, totalTimeTicks); this.arenaSlot = Math.max(0, arenaSlot);
+        this.sessionId = sessionId;
+        this.gateId = DungeonTypes.id(gateId);
+        this.templateId = DungeonTypes.id(templateId);
+        this.owner = owner;
+        this.members.add(owner);
+        this.members.addAll(members);
+        this.remainingTicks = Math.max(20, totalTimeTicks);
+        this.arenaSlot = Math.max(0, arenaSlot);
     }
 
     public UUID sessionId() { return sessionId; }
@@ -67,11 +74,13 @@ public final class DungeonSession {
     public int liveEnemyCount() { return liveEnemyCount; }
     public int totalSpawns() { return totalSpawns; }
     public int arenaSlot() { return arenaSlot; }
+    public int arenaVersion() { return arenaVersion; }
     public long lastActiveGameTime() { return lastActiveGameTime; }
     public long cleanupAfterGameTime() { return cleanupAfterGameTime; }
     public boolean arenaBuilt() { return arenaBuilt; }
     public boolean encounterSpawned() { return encounterSpawned; }
-    public boolean rewardGranted() { return rewardGranted; }
+    public boolean rewardGranted() { return rewardedMembers.containsAll(members); }
+    public boolean rewardGrantedTo(UUID playerId) { return rewardedMembers.contains(playerId); }
     public boolean rewardRoomCreated() { return rewardRoomCreated; }
     public UUID bossId() { return bossId; }
     public String failureReason() { return failureReason; }
@@ -90,27 +99,54 @@ public final class DungeonSession {
     public void setLiveEnemyCount(int value) { liveEnemyCount = Math.max(0, value); }
     public void enemySpawned(UUID id) { trackedEntities.add(id); liveEnemyCount++; totalSpawns++; }
     public void entityRemoved(UUID id) { if (trackedEntities.remove(id)) liveEnemyCount = Math.max(0, liveEnemyCount - 1); }
+    public void setArenaVersion(int value) { arenaVersion = Math.max(0, value); }
     public void setLastActiveGameTime(long value) { lastActiveGameTime = value; }
     public void setCleanupAfterGameTime(long value) { cleanupAfterGameTime = value; }
     public void setArenaBuilt(boolean value) { arenaBuilt = value; }
     public void setEncounterSpawned(boolean value) { encounterSpawned = value; }
-    public void setRewardGranted(boolean value) { rewardGranted = value; }
+    public boolean markRewardGranted(UUID playerId) { return members.contains(playerId) && rewardedMembers.add(playerId); }
+    public void setRewardGranted(boolean value) { if (value) rewardedMembers.addAll(members); else rewardedMembers.clear(); }
     public void setRewardRoomCreated(boolean value) { rewardRoomCreated = value; }
     public void setBossId(UUID value) { bossId = value; }
     public void setFailureReason(String value) { failureReason = value == null ? "" : value; }
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
-        tag.putUUID("session_id", sessionId); tag.putString("gate_id", gateId); tag.putString("template_id", templateId); tag.putUUID("owner", owner);
-        tag.putString("state", state.name()); tag.putString("dimension", dungeonDimension.location().toString()); tag.putLong("arena_origin", arenaOrigin.asLong());
-        tag.putInt("arena_slot", arenaSlot); tag.putInt("objective_index", objectiveIndex); tag.putInt("objective_progress", objectiveProgress);
-        tag.putInt("remaining_ticks", remainingTicks); tag.putInt("objective_ticks_remaining", objectiveTicksRemaining); tag.putInt("live_enemy_count", liveEnemyCount); tag.putInt("total_spawns", totalSpawns);
-        tag.putLong("last_active", lastActiveGameTime); tag.putLong("cleanup_after", cleanupAfterGameTime); tag.putBoolean("arena_built", arenaBuilt);
-        tag.putBoolean("encounter_spawned", encounterSpawned); tag.putBoolean("reward_granted", rewardGranted); tag.putBoolean("reward_room_created", rewardRoomCreated);
-        tag.putString("failure_reason", failureReason); if (bossId != null) tag.putUUID("boss_id", bossId);
-        ListTag memberList = new ListTag(); members.forEach(id -> memberList.add(StringTag.valueOf(id.toString()))); tag.put("members", memberList);
-        ListTag returnList = new ListTag(); returnPoints.forEach((id, point) -> returnList.add(point.save(id))); tag.put("return_points", returnList);
-        ListTag entityList = new ListTag(); trackedEntities.forEach(id -> entityList.add(StringTag.valueOf(id.toString()))); tag.put("tracked_entities", entityList);
+        tag.putUUID("session_id", sessionId);
+        tag.putString("gate_id", gateId);
+        tag.putString("template_id", templateId);
+        tag.putUUID("owner", owner);
+        tag.putString("state", state.name());
+        tag.putString("dimension", dungeonDimension.location().toString());
+        tag.putLong("arena_origin", arenaOrigin.asLong());
+        tag.putInt("arena_slot", arenaSlot);
+        tag.putInt("arena_version", arenaVersion);
+        tag.putInt("objective_index", objectiveIndex);
+        tag.putInt("objective_progress", objectiveProgress);
+        tag.putInt("remaining_ticks", remainingTicks);
+        tag.putInt("objective_ticks_remaining", objectiveTicksRemaining);
+        tag.putInt("live_enemy_count", liveEnemyCount);
+        tag.putInt("total_spawns", totalSpawns);
+        tag.putLong("last_active", lastActiveGameTime);
+        tag.putLong("cleanup_after", cleanupAfterGameTime);
+        tag.putBoolean("arena_built", arenaBuilt);
+        tag.putBoolean("encounter_spawned", encounterSpawned);
+        tag.putBoolean("reward_granted", rewardGranted());
+        tag.putBoolean("reward_room_created", rewardRoomCreated);
+        tag.putString("failure_reason", failureReason);
+        if (bossId != null) tag.putUUID("boss_id", bossId);
+        ListTag memberList = new ListTag();
+        members.forEach(id -> memberList.add(StringTag.valueOf(id.toString())));
+        tag.put("members", memberList);
+        ListTag returnList = new ListTag();
+        returnPoints.forEach((id, point) -> returnList.add(point.save(id)));
+        tag.put("return_points", returnList);
+        ListTag entityList = new ListTag();
+        trackedEntities.forEach(id -> entityList.add(StringTag.valueOf(id.toString())));
+        tag.put("tracked_entities", entityList);
+        ListTag rewardedList = new ListTag();
+        rewardedMembers.forEach(id -> rewardedList.add(StringTag.valueOf(id.toString())));
+        tag.put("rewarded_members", rewardedList);
         return tag;
     }
 
@@ -120,23 +156,44 @@ public final class DungeonSession {
                 tag.getUUID("owner"), members, tag.getInt("remaining_ticks"), tag.getInt("arena_slot"));
         try { session.state = DungeonTypes.SessionState.valueOf(tag.getString("state")); }
         catch (IllegalArgumentException ignored) { session.state = DungeonTypes.SessionState.FAILED; session.failureReason = "Invalid persisted state"; }
-        ResourceLocation location = ResourceLocation.tryParse(tag.getString("dimension")); if (location == null) location = Level.OVERWORLD.location();
-        session.dungeonDimension = ResourceKey.create(Registries.DIMENSION, location); session.arenaOrigin = BlockPos.of(tag.getLong("arena_origin"));
-        session.objectiveIndex = Math.max(0, tag.getInt("objective_index")); session.objectiveProgress = Math.max(0, tag.getInt("objective_progress"));
-        session.remainingTicks = Math.max(0, tag.getInt("remaining_ticks")); session.objectiveTicksRemaining = Math.max(0, tag.getInt("objective_ticks_remaining")); session.liveEnemyCount = Math.max(0, tag.getInt("live_enemy_count"));
-        session.totalSpawns = Math.max(0, tag.getInt("total_spawns")); session.lastActiveGameTime = tag.getLong("last_active");
-        session.cleanupAfterGameTime = tag.getLong("cleanup_after"); session.arenaBuilt = tag.getBoolean("arena_built");
-        session.encounterSpawned = tag.getBoolean("encounter_spawned"); session.rewardGranted = tag.getBoolean("reward_granted");
-        session.rewardRoomCreated = tag.getBoolean("reward_room_created"); session.failureReason = tag.getString("failure_reason");
+        ResourceLocation location = ResourceLocation.tryParse(tag.getString("dimension"));
+        if (location == null) location = Level.OVERWORLD.location();
+        session.dungeonDimension = ResourceKey.create(Registries.DIMENSION, location);
+        session.arenaOrigin = BlockPos.of(tag.getLong("arena_origin"));
+        session.objectiveIndex = Math.max(0, tag.getInt("objective_index"));
+        session.objectiveProgress = Math.max(0, tag.getInt("objective_progress"));
+        session.remainingTicks = Math.max(0, tag.getInt("remaining_ticks"));
+        session.objectiveTicksRemaining = Math.max(0, tag.getInt("objective_ticks_remaining"));
+        session.liveEnemyCount = Math.max(0, tag.getInt("live_enemy_count"));
+        session.totalSpawns = Math.max(0, tag.getInt("total_spawns"));
+        session.arenaVersion = Math.max(0, tag.getInt("arena_version"));
+        session.lastActiveGameTime = tag.getLong("last_active");
+        session.cleanupAfterGameTime = tag.getLong("cleanup_after");
+        session.arenaBuilt = tag.getBoolean("arena_built");
+        session.encounterSpawned = tag.getBoolean("encounter_spawned");
+        session.rewardRoomCreated = tag.getBoolean("reward_room_created");
+        session.failureReason = tag.getString("failure_reason");
         if (tag.hasUUID("boss_id")) session.bossId = tag.getUUID("boss_id");
         ListTag returns = tag.getList("return_points", Tag.TAG_COMPOUND);
-        for (int i = 0; i < returns.size(); i++) { Map.Entry<UUID, DungeonTypes.ReturnPoint> entry = DungeonTypes.ReturnPoint.load(returns.getCompound(i)); session.returnPoints.put(entry.getKey(), entry.getValue()); }
-        session.trackedEntities.addAll(uuidList(tag.getList("tracked_entities", Tag.TAG_STRING))); return session;
+        for (int i = 0; i < returns.size(); i++) {
+            Map.Entry<UUID, DungeonTypes.ReturnPoint> entry = DungeonTypes.ReturnPoint.load(returns.getCompound(i));
+            session.returnPoints.put(entry.getKey(), entry.getValue());
+        }
+        session.trackedEntities.addAll(uuidList(tag.getList("tracked_entities", Tag.TAG_STRING)));
+        if (tag.contains("rewarded_members", Tag.TAG_LIST)) {
+            session.rewardedMembers.addAll(uuidList(tag.getList("rewarded_members", Tag.TAG_STRING)));
+        } else if (tag.getBoolean("reward_granted")) {
+            session.rewardedMembers.addAll(session.members);
+        }
+        return session;
     }
 
     private static Set<UUID> uuidList(ListTag list) {
         Set<UUID> result = new LinkedHashSet<>();
-        for (int i = 0; i < list.size(); i++) try { result.add(UUID.fromString(list.getString(i))); } catch (IllegalArgumentException ignored) {}
+        for (int i = 0; i < list.size(); i++) {
+            try { result.add(UUID.fromString(list.getString(i))); }
+            catch (IllegalArgumentException ignored) {}
+        }
         return result;
     }
 }
