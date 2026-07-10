@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+
+# Forge run directories
+run/
+runs/
+logs/
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp
+
+# Generated archives and local diagnostics
+*.zip
+*.tar
+*.log
+recovery/

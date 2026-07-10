@@ -1,0 +1,56 @@
+{
+  "system": {
+    "subtitle": "subtitles.sololeveling.system",
+    "sounds": [
+      {
+        "name": "sololeveling:system",
+        "stream": false
+      }
+    ]
+  },
+  "level_up": {
+    "subtitle": "subtitles.sololeveling.level_up",
+    "sounds": [
+      {
+        "name": "sololeveling:level_up",
+        "stream": false
+      }
+    ]
+  },
+  "quest_complete": {
+    "subtitle": "subtitles.sololeveling.quest_complete",
+    "sounds": [
+      {
+        "name": "sololeveling:quest_complete",
+        "stream": false
+      }
+    ]
+  },
+  "ability": {
+    "subtitle": "subtitles.sololeveling.ability",
+    "sounds": [
+      {
+        "name": "sololeveling:ability",
+        "stream": false
+      }
+    ]
+  },
+  "shadow": {
+    "subtitle": "subtitles.sololeveling.shadow",
+    "sounds": [
+      {
+        "name": "sololeveling:shadow",
+        "stream": false
+      }
+    ]
+  },
+  "mana_fail": {
+    "subtitle": "subtitles.sololeveling.mana_fail",
+    "sounds": [
+      {
+        "name": "sololeveling:mana_fail",
+        "stream": false
+      }
+    ]
+  }
+}
