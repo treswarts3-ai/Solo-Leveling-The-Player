@@ -58,6 +58,19 @@ jobs:
           for source, target in targets.items():
               shutil.copyfile(temp / source, target)
 
+          screen = targets['SystemScreen.java']
+          text = screen.read_text(encoding='utf-8')
+          text = text.replace(
+              'for (int i = 0; i < 3; i++) {\n            Button button = Button.builder(Component.literal(names[i]), ignored -> send("EXERCISE:" + ids[i]))',
+              'for (int i = 0; i < 3; i++) {\n            int index = i;\n            Button button = Button.builder(Component.literal(names[i]), ignored -> send("EXERCISE:" + ids[index]))'
+          )
+          text = text.replace(
+              'for (int i = 0; i < labels.length; i++) {\n            int column = i % columns;',
+              'for (int i = 0; i < labels.length; i++) {\n            int index = i;\n            int column = i % columns;'
+          )
+          text = text.replace('ignored -> send(actions[i]))', 'ignored -> send(actions[index]))')
+          screen.write_text(text, encoding='utf-8')
+
       - name: Build Forge project
         id: build
         shell: bash
