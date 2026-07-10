@@ -245,7 +245,7 @@ public final class ProgressionChoiceHandler {
         HunterData.sync(player);
         player.sendSystemMessage(Component.literal("[RANK EVALUATION] Defeat " + D_RANK_KILLS
                 + " hostile enemies within 5 minutes without dying.").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-        player.level().playSound(null, player.blockPosition(), SoundEvents.RAID_HORN, SoundSource.PLAYERS, 0.7F, 1.2F);
+        player.level().playSound(null, player.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.7F, 1.2F);
         return true;
     }
 
