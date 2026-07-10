@@ -4,6 +4,7 @@ import com.tre.sololeveling.config.ModConfigs;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.phys.AABB;
@@ -39,14 +40,15 @@ public final class AbilityTargeting {
     }
 
     public static boolean isValidTarget(ServerPlayer player, Entity entity) {
-        if (entity == null || entity == player || !entity.isAlive() || !entity.isPickable()) return false;
+        if (entity == null || entity == player || !entity.isAlive()) return false;
+        if (!entity.isPickable() && !(entity instanceof ItemEntity)) return false;
         if (entity.level() != player.level()) return false;
         if (!player.serverLevel().hasChunkAt(entity.blockPosition())) return false;
         if (entity.getPersistentData().getBoolean("sl_shadow")) return false;
         if (entity instanceof Player targetPlayer) {
             if (!ModConfigs.PVP_ABILITIES.get()) return false;
             if (targetPlayer.isSpectator() || targetPlayer.isCreative()) return false;
-            if (player.getTeam() != null && player.getTeam() == targetPlayer.getTeam()) return false;
+            if (player.getTeam() != null && player.getTeam().equals(targetPlayer.getTeam())) return false;
         }
         return true;
     }
