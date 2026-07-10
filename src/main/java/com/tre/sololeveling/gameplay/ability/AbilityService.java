@@ -105,7 +105,7 @@ public final class AbilityService {
 
     private static boolean validPlayerState(ServerPlayer player) {
         return player != null && player.isAlive() && !player.isSpectator() && HunterData.isAwakened(player)
-                && player.server != null && player.serverLevel().hasChunkAt(player.blockPosition());
+                && player.getServer() != null && player.serverLevel().hasChunkAt(player.blockPosition());
     }
 
     private static void failure(ServerPlayer player, String feedback) {
