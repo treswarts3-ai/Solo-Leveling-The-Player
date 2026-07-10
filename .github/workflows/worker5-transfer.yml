@@ -1,0 +1,75 @@
+name: Apply Worker 5 Quest Commits
+
+on:
+  push:
+    branches:
+      - worker5-transfer
+    paths:
+      - '.github/workflows/worker5-transfer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout transfer payload
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Reconstruct and verify patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat worker5-transfer/quest-framework.part1 \
+              worker5-transfer/quest-framework.part2 \
+              worker5-transfer/quest-framework.part3 \
+              worker5-transfer/quest-framework.part4 > /tmp/quest-framework.b64
+          cp worker5-transfer/quest-content.b64 /tmp/quest-content.b64
+          test "$(git hash-object /tmp/quest-framework.b64)" = "39357c1ebb98958fac5034f5d8311a1204a46a61"
+          test "$(git hash-object /tmp/quest-content.b64)" = "b1dde1765907b5f7beb012d775dcd12b85f21d92"
+          base64 --decode /tmp/quest-framework.b64 | gzip --decompress > /tmp/quest-framework.patch
+          base64 --decode /tmp/quest-content.b64 | gzip --decompress > /tmp/quest-content.patch
+
+      - name: Apply and build quest framework
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main feature/quests
+          git checkout -B feature/quests origin/feature/quests
+          git config user.name "Worker 5 Quest Bot"
+          git config user.email "worker5-quests@users.noreply.github.com"
+          git apply --check /tmp/quest-framework.patch
+          git apply --whitespace=fix /tmp/quest-framework.patch
+          git add src/main/java
+          git commit -m "Add reusable quest framework"
+          chmod +x gradlew
+          ./gradlew clean build --stacktrace --no-daemon
+
+      - name: Apply and build quest content
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check /tmp/quest-content.patch
+          git apply --whitespace=fix /tmp/quest-content.patch
+          git add src/main/java
+          git commit -m "Add starter and repeatable quests"
+          ./gradlew clean build --stacktrace --no-daemon
+
+      - name: Push quest branch
+        shell: bash
+        run: git push origin HEAD:feature/quests
