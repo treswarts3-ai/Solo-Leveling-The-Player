@@ -31,13 +31,9 @@ public final class ClientEvents {
             minecraft.setScreen(new SystemScreen(SystemScreen.Tab.HOME));
         }
         while (ClientKeyMappings.SHADOWS.consumeClick()) minecraft.setScreen(new SystemScreen(SystemScreen.Tab.SHADOWS));
-        while (ClientKeyMappings.PRIMARY.consumeClick()) action("ABILITY:mutilation");
-        while (ClientKeyMappings.SECONDARY.consumeClick()) action("ABILITY:dagger_rush");
-        while (ClientKeyMappings.EXTRACT.consumeClick()) action("EXTRACT");
-        while (ClientKeyMappings.EXCHANGE.consumeClick()) action("SHADOW_EXCHANGE");
-        while (ClientKeyMappings.QUICKSILVER.consumeClick()) action("ABILITY:quicksilver");
-        while (ClientKeyMappings.AUTHORITY.consumeClick()) action("ABILITY:rulers_authority");
-        while (ClientKeyMappings.DODGE.consumeClick()) action("ABILITY:quicksilver");
+        for (ClientKeyMappings.AbilityBinding binding : ClientKeyMappings.ABILITIES) {
+            while (binding.mapping().consumeClick()) actionForAbility(binding.abilityId());
+        }
         while (ClientKeyMappings.HUD.consumeClick()) action("TOGGLE_HUD");
     }
 
@@ -164,6 +160,15 @@ public final class ClientEvents {
 
     private static boolean topAnchor() {
         return SystemUi.Settings.anchor() == SystemUi.HudAnchor.TOP_LEFT || SystemUi.Settings.anchor() == SystemUi.HudAnchor.TOP_RIGHT;
+    }
+
+    private static void actionForAbility(String abilityId) {
+        switch (abilityId) {
+            case "shadow_extraction" -> action("EXTRACT");
+            case "shadow_exchange" -> action("SHADOW_EXCHANGE");
+            case "shadow_summoning" -> action("SUMMON_SHADOW");
+            default -> action("ABILITY:" + abilityId);
+        }
     }
 
     private static void action(String action) {
