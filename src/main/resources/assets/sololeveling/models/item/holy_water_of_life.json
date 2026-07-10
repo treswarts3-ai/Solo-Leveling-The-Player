@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "sololeveling:item/holy_water_of_life"
+  }
+}

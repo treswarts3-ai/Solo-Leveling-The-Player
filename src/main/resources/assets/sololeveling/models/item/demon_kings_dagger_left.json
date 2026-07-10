@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "sololeveling:item/demon_kings_dagger_left"
+  }
+}
