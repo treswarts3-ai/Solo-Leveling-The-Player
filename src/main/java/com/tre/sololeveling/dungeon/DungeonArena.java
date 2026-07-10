@@ -84,7 +84,7 @@ public final class DungeonArena {
         // Maintenance room machinery and pipes.
         for (int x : new int[]{-8, 8}) {
             fill(level, origin, x, x, 2, 4, -4, 3, Blocks.COPPER_BLOCK.defaultBlockState());
-            fill(level, origin, x - 1, x + 1, 2, 2, 0, Blocks.CUT_COPPER.defaultBlockState());
+            fill(level, origin, x - 1, x + 1, 2, 2, 0, 0, Blocks.CUT_COPPER.defaultBlockState());
         }
         fill(level, origin, -9, 9, 5, 5, -4, -4, Blocks.EXPOSED_COPPER.defaultBlockState());
         set(level, origin.offset(-7, 2, 3), Blocks.CRAFTING_TABLE.defaultBlockState());
