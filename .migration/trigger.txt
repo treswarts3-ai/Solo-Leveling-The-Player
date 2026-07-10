@@ -1,1 +1,1 @@
-Trigger verified import with explicit asset dependencies.
+Trigger verified source-only import.
