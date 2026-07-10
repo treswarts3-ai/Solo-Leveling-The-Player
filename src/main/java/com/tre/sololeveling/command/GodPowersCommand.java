@@ -1,6 +1,7 @@
 package com.tre.sololeveling.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.gameplay.ability.AbilityService;
@@ -21,9 +22,7 @@ public final class GodPowersCommand {
         dispatcher.register(root("sololeveling"));
     }
 
-    private static net.minecraft.commands.arguments.selector.EntitySelectorParser unusedSelectorParserReference;
-
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> root(String name) {
+    private static LiteralArgumentBuilder<CommandSourceStack> root(String name) {
         return Commands.literal(name)
                 .then(Commands.literal("givemegodpowers")
                         .requires(source -> source.hasPermission(2))
