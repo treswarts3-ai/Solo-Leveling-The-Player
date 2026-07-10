@@ -32,6 +32,7 @@ public final class DungeonSession {
     private int objectiveIndex;
     private int objectiveProgress;
     private int remainingTicks;
+    private int objectiveTicksRemaining;
     private int liveEnemyCount;
     private int totalSpawns;
     private final int arenaSlot;
@@ -62,6 +63,7 @@ public final class DungeonSession {
     public int objectiveIndex() { return objectiveIndex; }
     public int objectiveProgress() { return objectiveProgress; }
     public int remainingTicks() { return remainingTicks; }
+    public int objectiveTicksRemaining() { return objectiveTicksRemaining; }
     public int liveEnemyCount() { return liveEnemyCount; }
     public int totalSpawns() { return totalSpawns; }
     public int arenaSlot() { return arenaSlot; }
@@ -83,7 +85,8 @@ public final class DungeonSession {
     public void addObjectiveProgress(int value) { objectiveProgress = Math.max(0, objectiveProgress + value); }
     public void advanceObjective() { objectiveIndex++; objectiveProgress = 0; encounterSpawned = false; bossId = null; }
     public void setRemainingTicks(int value) { remainingTicks = Math.max(0, value); }
-    public void tickTimer() { if (remainingTicks > 0) remainingTicks--; }
+    public void setObjectiveTicksRemaining(int value) { objectiveTicksRemaining = Math.max(0, value); }
+    public void tickTimers() { if (remainingTicks > 0) remainingTicks--; if (objectiveTicksRemaining > 0) objectiveTicksRemaining--; }
     public void setLiveEnemyCount(int value) { liveEnemyCount = Math.max(0, value); }
     public void enemySpawned(UUID id) { trackedEntities.add(id); liveEnemyCount++; totalSpawns++; }
     public void entityRemoved(UUID id) { if (trackedEntities.remove(id)) liveEnemyCount = Math.max(0, liveEnemyCount - 1); }
@@ -101,7 +104,7 @@ public final class DungeonSession {
         tag.putUUID("session_id", sessionId); tag.putString("gate_id", gateId); tag.putString("template_id", templateId); tag.putUUID("owner", owner);
         tag.putString("state", state.name()); tag.putString("dimension", dungeonDimension.location().toString()); tag.putLong("arena_origin", arenaOrigin.asLong());
         tag.putInt("arena_slot", arenaSlot); tag.putInt("objective_index", objectiveIndex); tag.putInt("objective_progress", objectiveProgress);
-        tag.putInt("remaining_ticks", remainingTicks); tag.putInt("live_enemy_count", liveEnemyCount); tag.putInt("total_spawns", totalSpawns);
+        tag.putInt("remaining_ticks", remainingTicks); tag.putInt("objective_ticks_remaining", objectiveTicksRemaining); tag.putInt("live_enemy_count", liveEnemyCount); tag.putInt("total_spawns", totalSpawns);
         tag.putLong("last_active", lastActiveGameTime); tag.putLong("cleanup_after", cleanupAfterGameTime); tag.putBoolean("arena_built", arenaBuilt);
         tag.putBoolean("encounter_spawned", encounterSpawned); tag.putBoolean("reward_granted", rewardGranted); tag.putBoolean("reward_room_created", rewardRoomCreated);
         tag.putString("failure_reason", failureReason); if (bossId != null) tag.putUUID("boss_id", bossId);
@@ -120,7 +123,7 @@ public final class DungeonSession {
         ResourceLocation location = ResourceLocation.tryParse(tag.getString("dimension")); if (location == null) location = Level.OVERWORLD.location();
         session.dungeonDimension = ResourceKey.create(Registries.DIMENSION, location); session.arenaOrigin = BlockPos.of(tag.getLong("arena_origin"));
         session.objectiveIndex = Math.max(0, tag.getInt("objective_index")); session.objectiveProgress = Math.max(0, tag.getInt("objective_progress"));
-        session.remainingTicks = Math.max(0, tag.getInt("remaining_ticks")); session.liveEnemyCount = Math.max(0, tag.getInt("live_enemy_count"));
+        session.remainingTicks = Math.max(0, tag.getInt("remaining_ticks")); session.objectiveTicksRemaining = Math.max(0, tag.getInt("objective_ticks_remaining")); session.liveEnemyCount = Math.max(0, tag.getInt("live_enemy_count"));
         session.totalSpawns = Math.max(0, tag.getInt("total_spawns")); session.lastActiveGameTime = tag.getLong("last_active");
         session.cleanupAfterGameTime = tag.getLong("cleanup_after"); session.arenaBuilt = tag.getBoolean("arena_built");
         session.encounterSpawned = tag.getBoolean("encounter_spawned"); session.rewardGranted = tag.getBoolean("reward_granted");
