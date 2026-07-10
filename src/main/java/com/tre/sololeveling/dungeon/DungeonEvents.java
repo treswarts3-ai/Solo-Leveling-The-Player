@@ -9,8 +9,11 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -30,6 +33,7 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid = SoloLevelingMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class DungeonEvents {
     private static final String[] RANKS = {"E", "D", "C", "B", "A", "S"};
+    private static final String GATE_CONTACT_COOLDOWN = "sl_gate_contact_cooldown";
 
     @SubscribeEvent
     public static void registerCommands(RegisterCommandsEvent event) {
@@ -103,7 +107,52 @@ public final class DungeonEvents {
     public static void serverTick(TickEvent.ServerTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
-        if (server != null) DungeonRuntime.tick(server);
+        if (server != null) {
+            animateGates(server);
+            DungeonRuntime.tick(server);
+        }
+    }
+
+    @SubscribeEvent
+    public static void playerTick(TickEvent.PlayerTickEvent event) {
+        if (event.phase != TickEvent.Phase.END || !(event.player instanceof ServerPlayer player)
+                || player.tickCount % 2 != 0 || player.isSpectator()) return;
+        MinecraftServer server = player.getServer();
+        if (server == null || DungeonRuntime.findSession(server, player.getUUID()) != null) return;
+
+        long now = player.level().getGameTime();
+        for (DungeonTypes.GateDefinition gate : DungeonSavedData.get(server).gates().values()) {
+            if (!player.level().dimension().equals(gate.dimension()) || !DungeonArena.gateTrigger(gate).intersects(player.getBoundingBox())) continue;
+            if (now < player.getPersistentData().getLong(GATE_CONTACT_COOLDOWN)) return;
+            player.getPersistentData().putLong(GATE_CONTACT_COOLDOWN, now + 40L);
+
+            DungeonRuntime.Result entered = DungeonRuntime.enterGate(player, gate.gateId());
+            if (!entered.success()) {
+                player.sendSystemMessage(Component.literal("[GATE] " + entered.message()).withStyle(ChatFormatting.RED));
+                return;
+            }
+
+            DungeonRuntime.Result started = DungeonRuntime.start(player);
+            if (!started.success()) {
+                player.sendSystemMessage(Component.literal("[DUNGEON] " + started.message()).withStyle(ChatFormatting.RED));
+            }
+            return;
+        }
+    }
+
+    private static void animateGates(MinecraftServer server) {
+        long now = server.overworld().getGameTime();
+        if (now % 4L != 0L) return;
+        for (DungeonTypes.GateDefinition gate : DungeonSavedData.get(server).gates().values()) {
+            ServerLevel level = server.getLevel(gate.dimension());
+            if (level == null) continue;
+            if (now % 40L == 0L) DungeonArena.placeGateMarker(level, gate);
+            BlockPos base = gate.position();
+            level.sendParticles(ParticleTypes.PORTAL, base.getX() + 0.5D, base.getY() + 2.2D, base.getZ() + 0.5D,
+                    12, 1.05D, 1.35D, 0.18D, 0.08D);
+            level.sendParticles(ParticleTypes.REVERSE_PORTAL, base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
+                    3, 0.7D, 1.1D, 0.12D, 0.02D);
+        }
     }
 
     @SubscribeEvent
