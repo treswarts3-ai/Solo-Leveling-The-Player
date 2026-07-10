@@ -1,1 +1,1 @@
-Trigger the verified one-use source import through pull request CI.
+Trigger archive diagnostics pass 2.
