@@ -20,6 +20,16 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
 
+      - name: Detect migration state
+        id: state
+        shell: bash
+        run: |
+          if [ -d .migration ]; then
+            echo 'pending=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'pending=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
@@ -32,6 +42,7 @@ jobs:
           gradle-version: '8.8'
 
       - name: Reconstruct verified source archive
+        if: steps.state.outputs.pending == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -52,14 +63,15 @@ jobs:
           test -f /tmp/solo-source/solo-migration-min/src/main/java/com/tre/sololeveling/SoloLevelingMod.java
 
       - name: Install organized project tree
+        if: steps.state.outputs.pending == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          rsync -a /tmp/solo-source/solo-migration-min/ ./
+          rsync -a --exclude='.github/' /tmp/solo-source/solo-migration-min/ ./
           rm -rf .migration
-          rm -f .github/workflows/import-organized-source.yml
 
       - name: Regenerate project assets
+        if: steps.state.outputs.pending == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -73,6 +85,7 @@ jobs:
           fi
 
       - name: Restore Gradle wrapper
+        if: steps.state.outputs.pending == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -82,9 +95,12 @@ jobs:
 
       - name: Build and verify Forge mod
         shell: bash
-        run: ./gradlew clean build --stacktrace --no-daemon
+        run: |
+          chmod +x gradlew
+          ./gradlew clean build --stacktrace --no-daemon
 
       - name: Commit verified organized source to migration branch
+        if: steps.state.outputs.pending == 'true'
         shell: bash
         run: |
           set -euo pipefail
