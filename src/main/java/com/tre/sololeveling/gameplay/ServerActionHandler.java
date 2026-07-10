@@ -91,18 +91,20 @@ public final class ServerActionHandler {
         if (price == null) return;
         ResourceLocation id = new ResourceLocation("sololeveling", name);
         Item item = ForgeRegistries.ITEMS.getValue(id);
-        if (item == null || !HunterData.spendGold(player, price)) {
+        boolean infiniteGold = HunterData.mutable(player).getBoolean("god_powers");
+        if (item == null || (!infiniteGold && !HunterData.spendGold(player, price))) {
             player.sendSystemMessage(Component.literal("[STORE] Purchase failed.").withStyle(ChatFormatting.RED));
             HunterData.sync(player);
             return;
         }
         if (!HunterData.storeSystemItem(player, new ItemStack(item))) {
-            HunterData.addGold(player, price);
+            if (!infiniteGold) HunterData.addGold(player, price);
             player.sendSystemMessage(Component.literal("[STORE] Purchase canceled because System storage is full.").withStyle(ChatFormatting.RED));
             HunterData.sync(player);
             return;
         }
-        player.sendSystemMessage(Component.literal("[STORE] Purchased " + item.getDescription().getString() + " for " + price + " gold.").withStyle(ChatFormatting.GOLD));
+        String cost = infiniteGold ? "infinite gold" : price + " gold";
+        player.sendSystemMessage(Component.literal("[STORE] Purchased " + item.getDescription().getString() + " with " + cost + ".").withStyle(ChatFormatting.GOLD));
         HunterData.sync(player);
     }
 
