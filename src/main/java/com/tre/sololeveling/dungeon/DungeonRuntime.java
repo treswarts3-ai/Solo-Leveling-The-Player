@@ -5,6 +5,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +35,7 @@ public final class DungeonRuntime {
     }
 
     private static final Map<UUID, Integer> MISSING_BOSS_TICKS = new HashMap<>();
+    private static final String PLAYER_RETURN_TAG = "sl_dungeon_return";
 
     public static Result createGate(ServerPlayer creator, String rawId, DungeonTypes.GateRank rank, String templateId) {
         String gateId = DungeonTypes.id(rawId);
@@ -91,7 +93,11 @@ public final class DungeonRuntime {
         DungeonArena.build(dungeonLevel, session);
         BlockPos entry = DungeonArena.entryPoint(session);
         for (ServerPlayer member : party) {
-            session.returnPoints().put(member.getUUID(), new DungeonTypes.ReturnPoint(member.level().dimension(), member.getX(), member.getY(), member.getZ(), member.getYRot(), member.getXRot()));
+            DungeonTypes.ReturnPoint returnPoint = new DungeonTypes.ReturnPoint(member.level().dimension(), member.getX(), member.getY(), member.getZ(), member.getYRot(), member.getXRot());
+            session.returnPoints().put(member.getUUID(), returnPoint);
+            CompoundTag recovery = returnPoint.save(member.getUUID());
+            recovery.putUUID("session_id", session.sessionId());
+            member.getPersistentData().put(PLAYER_RETURN_TAG, recovery);
             member.teleportTo(dungeonLevel, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
             member.sendSystemMessage(Component.literal("[GATE] Entered " + template.displayName() + ". Use /sl dungeon start when ready.").withStyle(ChatFormatting.LIGHT_PURPLE));
             DungeonHooks.post(new DungeonHooks.GateEnteredEvent(member, session));
@@ -227,7 +233,7 @@ public final class DungeonRuntime {
         session.entityRemoved(enemy.getUUID());
         ServerPlayer credited = null;
         if (sourceEntity instanceof ServerPlayer sourcePlayer) credited = sourcePlayer;
-        else if (enemy.getLastHurtByPlayer() instanceof ServerPlayer lastPlayer) credited = lastPlayer;
+        else if (enemy.getKillCredit() instanceof ServerPlayer lastPlayer) credited = lastPlayer;
         DungeonHooks.post(new DungeonHooks.EnemyDefeatedEvent(session, credited, enemy, DungeonEnemies.enemyId(enemy), DungeonEnemies.shadowExtractable(enemy)));
         if (objective != null && objective.type() == DungeonTypes.ObjectiveType.COLLECTION) DungeonEnemies.dropCollectionToken(level, enemy);
         if (DungeonBoss.isBoss(enemy)) {
@@ -341,6 +347,23 @@ public final class DungeonRuntime {
         if (session != null && session.isTerminal()) returnPlayer(player.server, session, player);
     }
 
+    public static void recoverPlayer(ServerPlayer player) {
+        if (!player.getPersistentData().contains(PLAYER_RETURN_TAG)) return;
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session != null && !session.isTerminal()) {
+            ServerLevel level = player.server.getLevel(session.dungeonDimension());
+            if (level != null && (player.level() != level || !DungeonArena.bounds(session).contains(player.position()))) {
+                BlockPos entry = DungeonArena.entryPoint(session);
+                player.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
+            }
+            return;
+        }
+        CompoundTag recovery = player.getPersistentData().getCompound(PLAYER_RETURN_TAG);
+        Map.Entry<UUID, DungeonTypes.ReturnPoint> entry = DungeonTypes.ReturnPoint.load(recovery);
+        teleportToPoint(player.server, player, entry.getValue());
+        player.getPersistentData().remove(PLAYER_RETURN_TAG);
+    }
+
     public static Result clearAll(MinecraftServer server) {
         DungeonSavedData data = DungeonSavedData.get(server);
         int count = data.sessions().size();
@@ -416,6 +439,14 @@ public final class DungeonRuntime {
 
     private static void returnPlayer(MinecraftServer server, DungeonSession session, ServerPlayer player) {
         DungeonTypes.ReturnPoint point = session.returnPoints().get(player.getUUID());
+        if (point == null && player.getPersistentData().contains(PLAYER_RETURN_TAG)) {
+            point = DungeonTypes.ReturnPoint.load(player.getPersistentData().getCompound(PLAYER_RETURN_TAG)).getValue();
+        }
+        teleportToPoint(server, player, point);
+        player.getPersistentData().remove(PLAYER_RETURN_TAG);
+    }
+
+    private static void teleportToPoint(MinecraftServer server, ServerPlayer player, DungeonTypes.ReturnPoint point) {
         ServerLevel target = point == null ? server.overworld() : server.getLevel(point.dimension());
         if (target == null) target = server.overworld();
         if (point == null) {
