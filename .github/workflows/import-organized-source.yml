@@ -63,8 +63,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check pillow
-          python tools/generate_assets.py
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python3 -m pip install --disable-pip-version-check pillow
+          python3 tools/generate_assets.py
           if [ -f ASSET_MANIFEST.md ]; then
             mkdir -p docs
             mv ASSET_MANIFEST.md docs/ASSET_MANIFEST.md
