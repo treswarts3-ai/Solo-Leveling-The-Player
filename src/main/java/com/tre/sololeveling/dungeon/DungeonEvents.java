@@ -60,47 +60,67 @@ public final class DungeonEvents {
                                                         StringArgumentType.getString(context, "template"))))))))
                 .then(Commands.literal("remove_gate").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("gate_id", StringArgumentType.word())
-                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonSavedData.get(context.getSource().getServer()).gates().keySet(), builder))
-                                .executes(context -> send(context.getSource(), DungeonRuntime.removeGate(context.getSource().getServer(), StringArgumentType.getString(context, "gate_id"))))))
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        DungeonSavedData.get(context.getSource().getServer()).gates().keySet(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.removeGate(
+                                        context.getSource().getServer(), StringArgumentType.getString(context, "gate_id"))))))
                 .then(Commands.literal("enter_gate")
                         .then(Commands.argument("gate_id", StringArgumentType.word())
-                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonSavedData.get(context.getSource().getServer()).gates().keySet(), builder))
-                                .executes(context -> send(context.getSource(), DungeonRuntime.enterGate(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "gate_id"))))
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        DungeonSavedData.get(context.getSource().getServer()).gates().keySet(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.enterGate(
+                                        context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "gate_id"))))
                                 .then(Commands.argument("party", EntityArgument.players())
                                         .requires(source -> source.hasPermission(2))
                                         .executes(context -> {
                                             ServerPlayer owner = context.getSource().getPlayerOrException();
                                             Collection<ServerPlayer> party = EntityArgument.getPlayers(context, "party");
-                                            return send(context.getSource(), DungeonRuntime.enterGate(owner, StringArgumentType.getString(context, "gate_id"), party));
+                                            return send(context.getSource(), DungeonRuntime.enterGate(owner,
+                                                    StringArgumentType.getString(context, "gate_id"), party));
                                         }))))
                 .then(Commands.literal("start_dungeon")
-                        .executes(context -> send(context.getSource(), DungeonRuntime.start(context.getSource().getPlayerOrException()))))
+                        .executes(context -> send(context.getSource(), DungeonRuntime.start(
+                                context.getSource().getPlayerOrException()))))
                 .then(Commands.literal("inspect_session")
                         .executes(context -> inspectCurrent(context.getSource()))
-                        .then(Commands.argument("session_id", StringArgumentType.word()).requires(source -> source.hasPermission(2))
-                                .executes(context -> inspect(context.getSource(), StringArgumentType.getString(context, "session_id")))))
+                        .then(Commands.argument("session_id", StringArgumentType.word())
+                                .requires(source -> source.hasPermission(2))
+                                .executes(context -> inspect(context.getSource(),
+                                        StringArgumentType.getString(context, "session_id")))))
                 .then(Commands.literal("spawn_wave").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("wave_id", StringArgumentType.word())
-                                .executes(context -> send(context.getSource(), DungeonRuntime.spawnWave(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "wave_id"))))))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.spawnWave(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "wave_id"))))))
                 .then(Commands.literal("complete_objective").requires(source -> source.hasPermission(2))
                         .executes(context -> completeCurrent(context.getSource()))
                         .then(Commands.argument("session_id", StringArgumentType.word())
-                                .executes(context -> complete(context.getSource(), StringArgumentType.getString(context, "session_id")))))
+                                .executes(context -> complete(context.getSource(),
+                                        StringArgumentType.getString(context, "session_id")))))
                 .then(Commands.literal("fail_dungeon").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("session_id", StringArgumentType.word())
-                                .executes(context -> fail(context.getSource(), StringArgumentType.getString(context, "session_id"), "Failed by command"))
+                                .executes(context -> fail(context.getSource(),
+                                        StringArgumentType.getString(context, "session_id"), "Failed by command"))
                                 .then(Commands.argument("reason", StringArgumentType.greedyString())
-                                        .executes(context -> fail(context.getSource(), StringArgumentType.getString(context, "session_id"), StringArgumentType.getString(context, "reason"))))))
+                                        .executes(context -> fail(context.getSource(),
+                                                StringArgumentType.getString(context, "session_id"),
+                                                StringArgumentType.getString(context, "reason"))))))
                 .then(Commands.literal("exit_dungeon")
-                        .executes(context -> send(context.getSource(), DungeonRuntime.exit(context.getSource().getPlayerOrException()))))
+                        .executes(context -> send(context.getSource(), DungeonRuntime.exit(
+                                context.getSource().getPlayerOrException()))))
                 .then(Commands.literal("clear_dungeon_state").requires(source -> source.hasPermission(2))
-                        .executes(context -> send(context.getSource(), DungeonRuntime.clearAll(context.getSource().getServer()))))
+                        .executes(context -> send(context.getSource(), DungeonRuntime.clearAll(
+                                context.getSource().getServer()))))
                 .then(Commands.literal("spawn_test_enemy").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("enemy_id", StringArgumentType.word())
-                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.enemyIds(), builder))
-                                .executes(context -> send(context.getSource(), DungeonRuntime.spawnTestEnemy(context.getSource().getPlayerOrException(), StringArgumentType.getString(context, "enemy_id"))))))
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        DungeonContent.enemyIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.spawnTestEnemy(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "enemy_id"))))))
                 .then(Commands.literal("spawn_test_boss").requires(source -> source.hasPermission(2))
-                        .executes(context -> send(context.getSource(), DungeonRuntime.spawnTestBoss(context.getSource().getPlayerOrException()))));
+                        .executes(context -> send(context.getSource(), DungeonRuntime.spawnTestBoss(
+                                context.getSource().getPlayerOrException()))));
     }
 
     @SubscribeEvent
@@ -123,7 +143,8 @@ public final class DungeonEvents {
 
         long now = player.level().getGameTime();
         for (DungeonTypes.GateDefinition gate : DungeonSavedData.get(server).gates().values()) {
-            if (!player.level().dimension().equals(gate.dimension()) || !DungeonArena.gateTrigger(gate).intersects(player.getBoundingBox())) continue;
+            if (!player.level().dimension().equals(gate.dimension())
+                    || !DungeonArena.gateTrigger(gate).intersects(player.getBoundingBox())) continue;
             if (now < player.getPersistentData().getLong(GATE_CONTACT_COOLDOWN)) return;
             player.getPersistentData().putLong(GATE_CONTACT_COOLDOWN, now + 40L);
 
@@ -132,27 +153,28 @@ public final class DungeonEvents {
                 player.sendSystemMessage(Component.literal("[GATE] " + entered.message()).withStyle(ChatFormatting.RED));
                 return;
             }
-
             DungeonRuntime.Result started = DungeonRuntime.start(player);
-            if (!started.success()) player.sendSystemMessage(Component.literal("[DUNGEON] " + started.message()).withStyle(ChatFormatting.RED));
+            if (!started.success()) {
+                player.sendSystemMessage(Component.literal("[DUNGEON] " + started.message()).withStyle(ChatFormatting.RED));
+            }
             return;
         }
     }
 
     private static void animateGates(MinecraftServer server) {
         long now = server.overworld().getGameTime();
-        if (now % 4L != 0L) return;
+        if (now % 8L != 0L) return;
         for (DungeonTypes.GateDefinition gate : DungeonSavedData.get(server).gates().values()) {
             ServerLevel level = server.getLevel(gate.dimension());
-            if (level == null) continue;
-            if (now % 40L == 0L) DungeonArena.placeGateMarker(level, gate);
+            if (level == null || !level.hasChunkAt(gate.position())) continue;
+            if (now % 80L == 0L) DungeonArena.placeGateMarker(level, gate);
             BlockPos base = gate.position();
-            level.sendParticles(ParticleTypes.PORTAL, base.getX() + 0.5D, base.getY() + 2.2D, base.getZ() + 0.5D,
-                    12, 1.05D, 1.35D, 0.18D, 0.08D);
-            level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
-                    6, 0.9D, 1.25D, 0.12D, 0.015D);
-            level.sendParticles(ParticleTypes.REVERSE_PORTAL, base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
-                    3, 0.7D, 1.1D, 0.12D, 0.02D);
+            level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME,
+                    base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
+                    4, 0.9D, 1.25D, 0.12D, 0.012D);
+            level.sendParticles(ParticleTypes.REVERSE_PORTAL,
+                    base.getX() + 0.5D, base.getY() + 2.0D, base.getZ() + 0.5D,
+                    4, 0.8D, 1.15D, 0.12D, 0.018D);
         }
     }
 
@@ -163,14 +185,18 @@ public final class DungeonEvents {
             ServerLevel level = server.getLevel(session.dungeonDimension());
             if (level == null) continue;
             int opened = Math.min(3, session.objectiveIndex());
-            for (int objective = 0; objective < opened; objective++) DungeonArena.openCheckpoint(level, session, objective);
+            for (int objective = 0; objective < opened; objective++) {
+                DungeonArena.openCheckpoint(level, session, objective);
+            }
         }
     }
 
     @SubscribeEvent
     public static void livingDeath(LivingDeathEvent event) {
         LivingEntity victim = event.getEntity();
-        if (DungeonEnemies.isDungeonEnemy(victim)) DungeonRuntime.onEnemyDeath(victim, event.getSource().getEntity());
+        if (DungeonEnemies.isDungeonEnemy(victim)) {
+            DungeonRuntime.onEnemyDeath(victim, event.getSource().getEntity());
+        }
         if (victim instanceof ServerPlayer player) DungeonRuntime.onPlayerDeath(player);
     }
 
@@ -194,11 +220,13 @@ public final class DungeonEvents {
         if (event.getEntity() instanceof ServerPlayer player) DungeonRuntime.onPlayerRespawn(player);
     }
 
-    private static int inspectCurrent(CommandSourceStack source) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+    private static int inspectCurrent(CommandSourceStack source)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
         ServerPlayer player = source.getPlayerOrException();
         DungeonSession session = DungeonRuntime.findSession(source.getServer(), player.getUUID());
         if (session == null) return send(source, DungeonRuntime.Result.fail("No dungeon session found"));
-        source.sendSuccess(() -> Component.literal(DungeonRuntime.inspect(source.getServer(), session)).withStyle(ChatFormatting.AQUA), false);
+        source.sendSuccess(() -> Component.literal(DungeonRuntime.inspect(source.getServer(), session))
+                .withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
@@ -207,12 +235,15 @@ public final class DungeonEvents {
         if (id == null) return send(source, DungeonRuntime.Result.fail("Invalid session UUID"));
         DungeonSession session = DungeonSavedData.get(source.getServer()).sessions().get(id);
         if (session == null) return send(source, DungeonRuntime.Result.fail("Session not found"));
-        source.sendSuccess(() -> Component.literal(DungeonRuntime.inspect(source.getServer(), session)).withStyle(ChatFormatting.AQUA), false);
+        source.sendSuccess(() -> Component.literal(DungeonRuntime.inspect(source.getServer(), session))
+                .withStyle(ChatFormatting.AQUA), false);
         return 1;
     }
 
-    private static int completeCurrent(CommandSourceStack source) throws com.mojang.brigadier.exceptions.CommandSyntaxException {
-        DungeonSession session = DungeonRuntime.findSession(source.getServer(), source.getPlayerOrException().getUUID());
+    private static int completeCurrent(CommandSourceStack source)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException {
+        DungeonSession session = DungeonRuntime.findSession(source.getServer(),
+                source.getPlayerOrException().getUUID());
         return session == null ? send(source, DungeonRuntime.Result.fail("No dungeon session found"))
                 : send(source, DungeonRuntime.forceCompleteObjective(source.getServer(), session.sessionId()));
     }
@@ -230,12 +261,16 @@ public final class DungeonEvents {
     }
 
     private static UUID parseUuid(String value) {
-        try { return UUID.fromString(value.toLowerCase(Locale.ROOT)); }
-        catch (IllegalArgumentException ignored) { return null; }
+        try {
+            return UUID.fromString(value.toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private static int send(CommandSourceStack source, DungeonRuntime.Result result) {
-        Component message = Component.literal(result.message()).withStyle(result.success() ? ChatFormatting.AQUA : ChatFormatting.RED);
+        Component message = Component.literal(result.message())
+                .withStyle(result.success() ? ChatFormatting.AQUA : ChatFormatting.RED);
         if (result.success()) source.sendSuccess(() -> message, true);
         else source.sendFailure(message);
         return result.success() ? 1 : 0;

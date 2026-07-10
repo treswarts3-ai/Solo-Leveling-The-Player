@@ -1,77 +1,139 @@
-# Gates, Dungeons, Enemies, and Boss Encounters
+# Dungeon and Gate System
 
 ## Scope
 
-Dungeon state is server authoritative and persisted in overworld `SavedData` under `sololeveling_dungeons`. Rewards are guarded by the persisted session-level `rewardGranted` flag before XP, gold, items, or integration reward hooks execute.
+Dungeon state is server-authoritative and persisted in overworld `SavedData` under `sololeveling_dungeons`. The workstream is implemented in `com.tre.sololeveling.dungeon`; progression, abilities, equipment, quests, and menus are integrated through hooks rather than owned here.
 
 ## Normal player flow
 
 1. An operator creates a gate with `/sl dungeon create_gate <gate_id> <rank> <template>`.
-2. The gate appears as a crying-obsidian frame with an open center and animated blue-purple portal particles.
-3. A player walks into the center of the frame.
-4. The server validates level and access rules, builds the dungeon, teleports the player inside, and starts the session automatically.
-5. Objectives spawn in their authored encounter rooms and checkpoint barriers open as objectives are completed.
-6. Defeating the boss opens the reward vault. Entering the vault completes the dungeon, grants rewards once, and returns the player safely during cleanup.
+2. A crying-obsidian frame is filled with a luminous blue animated, non-solid `gate_portal` surface.
+3. The player walks through the surface.
+4. The server checks the saved gate, level requirement, access hooks, proximity, duplicate-session state, and available arena capacity.
+5. The server builds the dungeon, stores return points, registers the session, teleports the party to a checked safe entry, and starts normal solo entry automatically.
+6. Encounters spawn in authored rooms. Each completed objective opens its checkpoint.
+7. Defeating the boss opens the reward vault. Entering the vault completes the session and grants each online member once.
+8. Manual exit, death, failure, or scheduled cleanup returns players to a checked safe position and removes session entities and arena blocks.
 
-`enter_gate` and `start_dungeon` remain available for testing and recovery, but are not required during normal solo play.
+`enter_gate` and `start_dungeon` remain available for administration, recovery, and multiplayer party testing. Normal solo play does not require them.
+
+## Gate implementation
+
+- `DungeonBlocks.GATE_PORTAL` is a registered common-side block.
+- It has no collision and no occlusion, emits light, and cannot be pushed.
+- The client assigns a translucent render layer and uses an animated blue vanilla soul-fire texture.
+- Ambient portal sound and local blue particles are produced by the block.
+- Lower-rate server particles provide a visible effect for nearby players.
+- Gate contact remains server-authoritative and uses saved gate lookup plus a 40-tick player cooldown.
+- Gate refresh only touches loaded chunks.
+- Removing a gate clears the current portal block, its crying-obsidian frame, and legacy purple-glass markers.
+- Existing saved gate records need no schema migration; loaded gates are refreshed into the new presentation.
 
 ## Dungeon templates
 
 | ID | Rank | Content |
 |---|---:|---|
-| `abandoned_subway` | E | Authored station route, platform wave, mana-crystal recovery, security elite, Subway Warden boss, sealed reward vault |
-| `red_orc_outpost` | B | Mixed combat wave, essence-core collection, commander escort elite, reward room |
-| `demon_castle_foyer` | A | Castle vanguard wave, demonic-core collection, twin commanders, Iron Sovereign boss, sovereign vault |
+| `abandoned_subway` | E | Authored station route, platform wave, mana-crystal recovery, security elite, Subway Warden, reward vault |
+| `red_orc_outpost` | B | Reusable fallback arena, mixed wave, essence collection, commander elite, reward room |
+| `demon_castle_foyer` | A | Reusable fallback arena, vanguard wave, core collection, twin commanders, Iron Sovereign, reward room |
 
-### Abandoned Subway layout
+## Abandoned Subway route
 
-The E-rank dungeon is no longer a flat square arena. It contains:
+The E-rank route is generated in this order:
 
-- gate vestibule and ticket hall
-- abandoned platform with tracks, columns, benches, damaged masonry, and lighting
-- maintenance tunnels with machinery and copper pipe details
-- security room and elite checkpoint
-- large blackstone boss chamber with a raised central dais
-- sealed reward vault that opens after the Subway Warden is defeated
+1. Entrance vestibule and station marker
+2. Ticket hall with booths and turnstiles
+3. Platform encounter
+4. Maintenance machinery and pipe area
+5. Security room and elite checkpoint
+6. Subway Warden boss chamber
+7. Sealed reward vault
 
-Encounter spawn points are tied to the current objective room. Spawn correction searches for a supported two-block-high position before adding an enemy.
+Every room-to-corridor seam is explicitly carved after room generation. This avoids the previous failure mode where independently generated room walls blocked the intended route.
 
-## Enemy definitions
+Environmental details include:
 
-Base variants:
+- raised platform edges and yellow safety strips
+- recessed gravel track bed and rails
+- station columns, benches, ticket booths, and a lit station marker
+- cracked masonry, rubble piles, broken lamps, and a water-leak feature
+- copper machinery, exposed pipes, work surfaces, barrels, and anvils
+- barred security staging and colored room markers
+- a raised gilded boss dais, soul lighting, pillars, and side rubble
+- a gold-lined reward vault with a presentation chest
 
-- `goblin_soldier` — melee
-- `steel_fang_raider` — fast
-- `stone_guardian` — tank
-- `dungeon_archer` — ranged
-- `orc_commander` — elite
+Arena placement is bounded to the authored footprint and uses client-update block flags instead of full neighbor updates for every block. Existing identical states are skipped.
 
-Shadow-extractable variants:
+## Encounter pacing
 
-- `shadow_goblin`
-- `shadow_raider`
-- `shadow_guardian`
-- `shadow_archer`
-- `shadow_commander`
+The E-rank sequence is tuned as an introductory dungeon:
 
-All dungeon enemies carry the `sl_dungeon_session`, `sl_enemy_id`, `sl_dungeon_enemy`, and `sl_shadow_extractable` persistent tags. Vanilla drops and experience are suppressed. Integration code can inspect the tags or subscribe to `DungeonHooks.EnemyDefeatedEvent`.
+1. Platform: three Goblin Soldiers and two Steel Fang Raiders
+2. Collection: three Goblin Soldiers and two Dungeon Archers; recover three Mana Crystals
+3. Elite: one Station Guard and one escort
+4. Boss: Subway Warden
+5. Reward vault
 
-## Bosses
+The E-rank direct reward is 750 XP, 280 gold, four emeralds, eight amethyst shards, and three gold ingots. Integration reward hooks may add system-specific rewards through the one-time authoritative path.
 
-### Subway Warden
+Spawn placement searches a bounded radius for a sturdy floor, world-border validity, an empty entity collision box, and no liquid. If enough safe positions cannot be found, the encounter fails rather than spawning enemies inside blocks.
 
-The E-rank Abandoned Subway ends with a lower-health Ravager-based boss tuned for early progression. It uses:
+## Subway Warden
 
-- server boss health bar
-- telegraphed cleave and radial stomp
-- phase transition at 50 percent health
-- phase-two adds and directional blast
-- lower E-rank health and damage scaling
-- shadow-extraction eligibility
+The Warden is an early-game Ravager-based boss with:
 
-### Iron Sovereign
+- 180 base health before rank scaling
+- 8.5 base attack damage
+- six armor and reduced knockback resistance
+- server boss bar
+- telegraphed cleave and stomp attacks
+- phase change at 50 percent health
+- two Steel Fang Raider reinforcements
+- telegraphed directional blast in phase two
+- persisted phase and reinforcement flags to prevent restart duplication
+- damage filtering so only members of its dungeon session are targeted by scripted attacks
 
-The higher-rank Iron Sovereign retains the heavier version of the same encounter framework with increased health, armor, damage, and phase pressure.
+The higher-rank Iron Sovereign retains the heavier version of the encounter framework.
+
+## Checkpoints and objectives
+
+Checkpoint barriers are placed at the platform-to-maintenance, maintenance-to-security, and security-to-boss transitions. A barrier opens immediately when its objective completes and is also synchronized periodically from the persisted objective index for restart recovery.
+
+Collection tokens are session-tagged Mana Crystal item entities. They cannot be picked up as normal items. When a party member moves within three blocks, the server removes the token and advances the objective. Session cleanup removes remaining tokens.
+
+The reward room is created only during the reward objective. Entering its center completes the objective; opening the chest is not required and cannot grant the authoritative XP or gold reward a second time.
+
+## Persistence and lifecycle safety
+
+Persisted session data includes:
+
+- session, gate, template, owner, and member IDs
+- dungeon dimension, arena origin, arena slot, and arena layout version
+- return points
+- state, timers, objective index, and progress
+- tracked entities and live-spawn counters
+- boss ID
+- reward-distribution lock and rewarded-member IDs
+- cleanup time and failure reason
+
+Safety behavior:
+
+- Active arena slots are never reallocated. Allocation fails cleanly if all bounded slots are occupied.
+- A session is inserted into saved data before party teleportation, preventing duplicate entry during the transition.
+- All party members must be in the gate dimension and near the gate.
+- Entry and return teleports search for a supported, collision-free, liquid-free position.
+- Waiting sessions using an older arena layout are rebuilt and migrated.
+- Active sessions using an incompatible old layout fail safely instead of rebuilding around players or enemies.
+- Login recovery returns active members to a safe dungeon entry when they are outside the arena.
+- Completed members who reconnect before cleanup receive a still-pending per-member reward at most once.
+- Reward recipients are marked in saved data before XP, gold, items, or integration hooks run.
+- Boss phase-two reinforcement state is persisted on the boss entity.
+- Player death fails an active session. Respawn returns the player after terminal state.
+- Manual exit returns the player; if no party member remains, the session fails.
+- Waiting sessions expire after five minutes without a member in the arena.
+- Active sessions fail after one minute without a member in the arena.
+- Completed sessions clean up after 20 seconds; failed sessions clean up after five seconds.
+- Cleanup queries only the session arena, discards session-tagged entities, clears the authored footprint, removes the boss bar, and deletes the saved session.
 
 ## Commands
 
@@ -79,72 +141,50 @@ Both `/sl dungeon` and `/sololeveling dungeon` expose the same commands.
 
 | Command | Permission | Purpose |
 |---|---:|---|
-| `create_gate <gate_id> <rank> <template>` | 2 | Create a persistent interactive gate near the command source |
-| `remove_gate <gate_id>` | 2 | Remove a persistent gate and its marker |
-| `enter_gate <gate_id>` | Player | Manual recovery/test entry |
-| `enter_gate <gate_id> <party selector>` | 2 | Enter with an explicit party of up to eight online players |
-| `start_dungeon` | Owner | Manual recovery/test start for a waiting session |
-| `inspect_session [session_uuid]` | Player / 2 | Inspect the current or selected session |
-| `spawn_wave <wave_id>` | 2 | Spawn a template wave while respecting hard caps |
+| `create_gate <gate_id> <rank> <template>` | 2 | Create a persistent interactive gate |
+| `remove_gate <gate_id>` | 2 | Remove a gate and every recognized marker block |
+| `enter_gate <gate_id>` | Player | Manual solo recovery/test entry |
+| `enter_gate <gate_id> <party selector>` | 2 | Enter with up to eight nearby online players |
+| `start_dungeon` | Owner | Start a waiting session manually |
+| `inspect_session [session_uuid]` | Player / 2 | Inspect objective, timers, layout, enemies, and reward recipients |
+| `spawn_wave <wave_id>` | 2 | Spawn a template wave within hard caps |
 | `complete_objective [session_uuid]` | 2 | Complete the current objective for testing or recovery |
 | `fail_dungeon <session_uuid> [reason]` | 2 | Fail a session safely |
-| `exit_dungeon` | Player | Return to the stored safe return point |
-| `clear_dungeon_state` | 2 | Exit players, remove tracked entities, clear arenas, and remove sessions |
-| `spawn_test_enemy <enemy_id>` | 2 | Spawn a reusable test enemy in the current encounter room |
-| `spawn_test_boss` | 2 | Spawn the template boss in the current boss chamber |
+| `exit_dungeon` | Player | Return to a checked safe return point |
+| `clear_dungeon_state` | 2 | Return players, clear arenas and entities, and remove sessions |
+| `spawn_test_enemy <enemy_id>` | 2 | Spawn a test enemy near the player using safe placement |
+| `spawn_test_boss` | 2 | Spawn the current template boss |
 
 ## Integration APIs
 
-### Access rules
+`DungeonHooks` exposes access rules, reward hooks, and Forge events:
 
-```java
-DungeonHooks.registerAccessRule((player, gate, template) -> {
-    // Return an empty string to allow entry.
-    // Return a user-facing denial reason to block entry.
-    return "";
-});
+- `GateEnteredEvent`
+- `SessionStartedEvent`
+- `ObjectiveCompletedEvent`
+- `EnemyDefeatedEvent`
+- `DungeonCompletedEvent`
+- `DungeonFailedEvent`
+- `RewardGrantedEvent`
+
+Dungeon enemies carry session, enemy-ID, dungeon-enemy, and shadow-extractable tags. Vanilla drops and experience are suppressed.
+
+## Hard limits
+
+- Maximum eight requested party members
+- Maximum 64 live dungeon enemies per session
+- Maximum 160 total wave spawns per session
+- Maximum 4,096 reserved arena slots
+- Bounded arena entity queries; no full-world entity scan
+- Collection scans limited to the arena every four ticks
+- Gate animation skips unloaded chunks
+
+## Validation and remaining risks
+
+The required build command is:
+
+```bash
+./gradlew clean build --stacktrace --no-daemon
 ```
 
-Use this for quest prerequisites, equipment checks, party composition, or other server-side entry requirements without changing dungeon internals.
-
-### Extra rewards
-
-```java
-DungeonHooks.registerRewardHook((player, session, template) -> {
-    // Add quest, equipment, title, or shadow-system rewards.
-});
-```
-
-The hook executes only through the one-time authoritative reward path.
-
-### Forge events
-
-- `DungeonHooks.GateEnteredEvent`
-- `DungeonHooks.SessionStartedEvent`
-- `DungeonHooks.ObjectiveCompletedEvent`
-- `DungeonHooks.EnemyDefeatedEvent`
-- `DungeonHooks.DungeonCompletedEvent`
-- `DungeonHooks.DungeonFailedEvent`
-- `DungeonHooks.RewardGrantedEvent`
-
-## Safety and lifecycle rules
-
-- Maximum 64 live dungeon enemies per session.
-- Maximum 160 total wave spawns per session.
-- Arena entity queries are bounded to the session arena; no full-world entity scans run each tick.
-- Collection scans run inside the arena every four ticks.
-- Gate contact uses a cooldown to prevent duplicate session creation.
-- Waiting sessions expire after five minutes without a present member.
-- Active sessions fail after one minute without a present member.
-- Total and per-objective timers are persisted.
-- Players retain a persistent return marker in addition to the session return map.
-- Completed sessions clean up after 20 seconds; failed sessions clean up after five seconds.
-- Cleanup discards session-tagged entities, clears the arena, removes the boss bar, returns online players, and removes the session record.
-
-## Remaining limitations
-
-- Dungeons are isolated at reserved far-overworld coordinates rather than in a custom dimension.
-- Direct rewards are issued to online session members at completion; offline reward-mail persistence is not included.
-- Red Orc Outpost and Demon Castle still use the reusable fallback arena and need authored layouts.
-- Portal presentation currently uses an open frame plus particles rather than a registered custom no-collision portal block.
-- Full gameplay balance and multiplayer soak testing remain required.
+A successful Forge build proves source/resource compatibility, not gameplay behavior. Hands-on Minecraft testing is still required for portal appearance, full physical traversal, perceived difficulty, multiplayer movement, death/reconnect timing, and visual cleanup. Red Orc Outpost and Demon Castle still use the fallback arena and are outside this workstream.
