@@ -180,7 +180,7 @@ public final class DungeonBoss {
             level.sendParticles(particle, boss.getX() + Math.cos(angle) * radius, boss.getY() + 0.15D, boss.getZ() + Math.sin(angle) * radius,
                     1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
-        level.playSound(null, boss.blockPosition(), SoundEvents.NOTE_BLOCK_BASS, SoundSource.HOSTILE, 1.0F, 0.55F);
+        level.playSound(null, boss.blockPosition(), SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.HOSTILE, 1.0F, 0.55F);
     }
 
     private static void telegraphLine(ServerLevel level, Ravager boss) {
@@ -189,7 +189,7 @@ public final class DungeonBoss {
             Vec3 point = boss.position().add(look.scale(i)).add(0.0D, 0.2D, 0.0D);
             level.sendParticles(ParticleTypes.WITCH, point.x, point.y, point.z, 2, 0.1D, 0.05D, 0.1D, 0.0D);
         }
-        level.playSound(null, boss.blockPosition(), SoundEvents.NOTE_BLOCK_BASS, SoundSource.HOSTILE, 1.2F, 0.4F);
+        level.playSound(null, boss.blockPosition(), SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.HOSTILE, 1.2F, 0.4F);
     }
 
     private static void knock(ServerPlayer player, Vec3 source, double force) {
