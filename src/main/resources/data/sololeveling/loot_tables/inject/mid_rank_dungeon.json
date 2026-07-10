@@ -1,0 +1,56 @@
+{
+  "type": "minecraft:chest",
+  "pools": [
+    {
+      "rolls": {
+        "type": "minecraft:uniform",
+        "min": 1.0,
+        "max": 2.0
+      },
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:equipment_fragment",
+          "weight": 18,
+          "functions": [
+            {
+              "function": "minecraft:set_count",
+              "count": {
+                "type": "minecraft:uniform",
+                "min": 2.0,
+                "max": 5.0
+              },
+              "add": false
+            }
+          ]
+        },
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:enchanted_steel",
+          "weight": 12
+        },
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:reinforcement_core",
+          "weight": 8
+        },
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:knight_killer",
+          "weight": 2
+        },
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:barukas_dagger",
+          "weight": 1
+        },
+        {
+          "type": "minecraft:item",
+          "name": "sololeveling:assassins_hood",
+          "weight": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "sololeveling:reinforcement_core"
+    },
+    {
+      "item": "sololeveling:reinforcement_core"
+    },
+    {
+      "item": "sololeveling:shadow_silk"
+    },
+    {
+      "item": "sololeveling:essence_stone"
+    }
+  ],
+  "result": {
+    "item": "sololeveling:monarch_reinforcement_core",
+    "count": 1
+  }
+}

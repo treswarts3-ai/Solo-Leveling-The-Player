@@ -1,10 +1,11 @@
 package com.tre.sololeveling.client.screen;
 
 import com.tre.sololeveling.client.ClientHunterData;
+import com.tre.sololeveling.client.ui.SystemUi;
 import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.network.packet.ActionPacket;
-import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -14,187 +15,629 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public final class SystemScreen extends Screen {
-    private static final int INVENTORY_COLUMNS = 9;
-    private static final int INVENTORY_ROWS = 6;
-    private static final int INVENTORY_PAGE_SIZE = INVENTORY_COLUMNS * INVENTORY_ROWS;
-    public enum Tab { STATUS, SKILLS, QUESTS, STORE, SHADOWS, INVENTORY }
-    private Tab tab;
-    private int left, top;
-    private int inventoryPage;
-    public SystemScreen(Tab tab) { super(Component.translatable("screen.sololeveling.system")); this.tab = tab; }
+    public enum Tab { HOME, STATUS, SKILLS, QUESTS, STORE, EQUIPMENT, INVENTORY, SHADOWS, SETTINGS }
 
-    @Override protected void init() {
-        left = (width - 340) / 2; top = (height - 214) / 2;
-        int tx = left + 8;
-        for (Tab value : Tab.values()) {
-            Tab target = value;
-            addRenderableWidget(Button.builder(Component.literal(shortName(value)), b -> { tab = target; rebuildWidgets(); }).bounds(tx, top + 9, 51, 18).build());
-            tx += 54;
-        }
-        CompoundTag t = ClientHunterData.get();
-        if (!t.getBoolean("awakened")) {
-            addRenderableWidget(Button.builder(Component.literal("AWAKEN SYSTEM"), b -> send("awaken", "", 0)).bounds(left+105, top+90, 130, 22).build());
-            return;
-        }
-        if (tab == Tab.STATUS) addStatusButtons();
-        if (tab == Tab.SKILLS) addSkillButtons();
-        if (tab == Tab.QUESTS) addQuestButtons();
-        if (tab == Tab.STORE) addStoreButtons();
-        if (tab == Tab.SHADOWS) addShadowButtons();
-        if (tab == Tab.INVENTORY) addInventoryButtons();
+    private static final String[] STATS = {"strength", "agility", "stamina", "intelligence", "sense"};
+    private static final String[] ACTIVE_SKILLS = {"stealth", "bloodlust", "quicksilver", "mutilation", "dagger_rush", "rulers_authority", "dragons_fear"};
+    private static final String[] STORE_IDS = {"healing_potion", "mana_potion", "greater_healing_potion", "greater_mana_potion", "knight_killer", "blessed_random_box"};
+    private static final int[] STORE_PRICES = {50, 60, 150, 175, 1500, 750};
+
+    private final EnumMap<Tab, Integer> scrollOffsets = new EnumMap<>(Tab.class);
+    private final Map<String, Button> actionButtons = new HashMap<>();
+    private final List<StoreButton> storeButtons = new ArrayList<>();
+    private Tab tab;
+    private int left;
+    private int top;
+    private int panelWidth;
+    private int panelHeight;
+    private int contentX;
+    private int contentY;
+    private int contentWidth;
+    private int contentHeight;
+    private boolean wideNavigation;
+    private boolean lastAwakened;
+    private int inventoryPage;
+    private String selectedSkill = "mutilation";
+
+    public SystemScreen(Tab tab) {
+        super(Component.translatable("screen.sololeveling.system"));
+        this.tab = tab == null ? Tab.HOME : tab;
+        for (Tab value : Tab.values()) scrollOffsets.put(value, 0);
     }
 
     @Override
-    protected void rebuildWidgets() { clearWidgets(); init(); }
-    private void addStatusButtons() {
-        String[] stats={"strength","agility","stamina","intelligence","sense"}; int y=top+63;
-        for(String stat:stats){ addRenderableWidget(Button.builder(Component.literal("+"),b->send("allocate",stat,1)).bounds(left+288,y-3,18,16).build()); y+=22; }
-    }
-    private void addSkillButtons() {
-        String[] modes={"pull","push","hold","throw","dash","flight"};
-        for(int i=0;i<modes.length;i++){
-            String mode=modes[i];
-            int x=left+20+(i%3)*102,y=top+158+(i/3)*23;
-            addRenderableWidget(Button.builder(Component.literal("Authority: "+capitalize(mode)),b->send("authority",mode,0)).bounds(x,y,96,19).build());
+    protected void init() {
+        actionButtons.clear();
+        storeButtons.clear();
+        panelWidth = Math.min(Math.max(220, width - 24), Math.min(520, Math.max(220, width - 8)));
+        panelHeight = Math.min(Math.max(176, height - 24), Math.min(300, Math.max(176, height - 8)));
+        left = (width - panelWidth) / 2;
+        top = (height - panelHeight) / 2;
+        wideNavigation = panelWidth >= 410 && panelHeight >= 224;
+        contentX = left + (wideNavigation ? 108 : 12);
+        contentY = top + (wideNavigation ? 38 : 84);
+        contentWidth = panelWidth - (wideNavigation ? 120 : 24);
+        contentHeight = panelHeight - (wideNavigation ? 50 : 96);
+        lastAwakened = ClientHunterData.awakened();
+        addNavigation();
+
+        if (!lastAwakened) {
+            Button awaken = Button.builder(Component.literal("AWAKEN SYSTEM"), button -> send("AWAKEN"))
+                    .bounds(left + panelWidth / 2 - 66, top + panelHeight / 2 - 10, 132, 20).build();
+            addRenderableWidget(awaken);
+            return;
         }
-    }
-    private void addQuestButtons() {
-        addRenderableWidget(Button.builder(Component.literal("Push-up"), b -> send("exercise","pushup",0)).bounds(left+20,top+184,70,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Sit-up"), b -> send("exercise","situp",0)).bounds(left+94,top+184,65,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Squat"), b -> send("exercise","squat",0)).bounds(left+163,top+184,65,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Claim"), b -> send("quest","claim_daily",0)).bounds(left+232,top+184,75,18).build());
-    }
-    private void addStoreButtons() {
-        store("Healing Potion", "healing_potion", 50, 55); store("Mana Potion", "mana_potion", 60, 80); store("Knight Killer", "knight_killer", 1500, 105); store("Random Box", "blessed_random_box", 750, 130);
-    }
-    private void store(String label,String id,int price,int y){ addRenderableWidget(Button.builder(Component.literal("Buy " + label + " - " + price + "G"),b->send("buy",id,price)).bounds(left+65,top+y,210,20).build()); }
-    private void addShadowButtons() {
-        addRenderableWidget(Button.builder(Component.literal("Extract"),b->send("shadow","extract",0)).bounds(left+28,top+162,70,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Summon"),b->send("shadow","summon",0)).bounds(left+102,top+162,70,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Dismiss All"),b->send("shadow","dismiss",0)).bounds(left+176,top+162,75,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Exchange"),b->send("shadow","exchange",0)).bounds(left+255,top+162,62,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Domain"),b->send("shadow","domain",0)).bounds(left+88,top+185,75,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Cycle Mode"),b->send("shadow","mode",0)).bounds(left+168,top+185,85,18).build());
-    }
-    private void addInventoryButtons() {
-        addRenderableWidget(Button.builder(Component.literal("Store Held Item"),b->send("inventory","store",0)).bounds(left+20,top+184,105,18).build());
-        addRenderableWidget(Button.builder(Component.literal("< Prev"),b->{ inventoryPage=Math.max(0,inventoryPage-1); rebuildWidgets(); }).bounds(left+217,top+184,48,18).build());
-        addRenderableWidget(Button.builder(Component.literal("Next >"),b->{
-            int count=ClientHunterData.get().getList("system_inventory",Tag.TAG_COMPOUND).size();
-            int maxPage=Math.max(0,(count-1)/INVENTORY_PAGE_SIZE);
-            inventoryPage=Math.min(maxPage,inventoryPage+1);
-            rebuildWidgets();
-        }).bounds(left+270,top+184,48,18).build());
+
+        switch (tab) {
+            case HOME -> { }
+            case STATUS -> addStatsButtons();
+            case SKILLS -> addSkillButtons();
+            case QUESTS -> addQuestButtons();
+            case STORE -> addStoreButtons();
+            case EQUIPMENT -> { }
+            case INVENTORY -> addInventoryButtons();
+            case SHADOWS -> addShadowButtons();
+            case SETTINGS -> addSettingsButtons();
+        }
+        refreshButtonStates();
     }
 
-    @Override public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        renderBackground(g); panel(g,left,top,340,214); super.render(g,mouseX,mouseY,partialTick);
-        CompoundTag t=ClientHunterData.get();
-        g.drawCenteredString(font, title, width/2, top+34, 0xFF78E9FF);
-        if(!t.getBoolean("awakened")){ g.drawCenteredString(font,"A strange blue interface waits for your response.",width/2,top+70,0xFFBBD6EA); return; }
-        switch(tab){case STATUS->status(g,t);case SKILLS->skills(g,t);case QUESTS->quests(g,t);case STORE->store(g,t);case SHADOWS->shadows(g,t);case INVENTORY->inventory(g,t,mouseX,mouseY);}
-    }
-    private void status(GuiGraphics g,CompoundTag t){
-        int level=Math.max(1,t.getInt("level")),xp=t.getInt("xp"),need=Math.max(100,(int)Math.floor(100*Math.pow(level,1.55)));
-        String displayRank=blank(t.getString("rank_override"),rank(level,t.getBoolean("black_heart")));
-        text(g,"LEVEL  " + level + "       RANK  " + displayRank,left+22,top+50,0xFFFFFFFF);
-        text(g,"XP  " + xp + " / " + need + "       GOLD  " + t.getInt("gold"),left+22,top+65,0xFF8EEBFF);
-        text(g,"JOB  " + blank(t.getString("job"),"None") + "       TITLE  " + blank(t.getString("title"),"The Player"),left+22,top+80,0xFFD9C6FF);
-        String[] stats={"strength","agility","stamina","intelligence","sense"};int y=top+105;
-        for(String s:stats){text(g,s.toUpperCase(Locale.ROOT)+"  "+Math.max(1,t.getInt(s)),left+35,y,0xFFEAF7FF);y+=22;}
-        text(g,"UNSPENT STAT POINTS: "+t.getInt("stat_points"),left+178,top+105,0xFFFFD66B);
-        int maxMana=100+level*2+Math.max(1,t.getInt("intelligence"))*8+(t.getBoolean("black_heart")?1000:0);
-        text(g,"MANA: "+t.getInt("mana")+" / "+maxMana,left+178,top+127,0xFF9C82FF);
-        text(g,"SYSTEM INVENTORY: "+t.getList("system_inventory",10).size()+" / 108",left+178,top+149,0xFF8EEBFF);
-        text(g,"SHADOW CAPACITY: "+shadowCap(t),left+178,top+171,0xFFC8A7FF);
-    }
-    private void skills(GuiGraphics g,CompoundTag t){
-        for(int i=0;i<HunterData.SKILLS.length;i++){
-            String skill=HunterData.SKILLS[i];boolean on=t.getBoolean("skill_"+skill);
-            int column=i/8,row=i%8,x=left+16+column*166,y=top+50+row*13;
-            text(g,(on?"[+] ":"[-] ")+skill.replace('_',' ').toUpperCase(Locale.ROOT),x,y,on?0xFF7DEBFF:0xFF657188);
-        }
-        text(g,"RULER'S AUTHORITY CONTROLS",left+82,top+144,0xFFD9C6FF);
-    }
-    private void quests(GuiGraphics g,CompoundTag t){
-        String main=t.getString("active_main_quest").replace('_',' ').toUpperCase(Locale.ROOT);
-        text(g,"MAIN QUEST: "+main,left+20,top+50,0xFFD9C6FF);
-        text(g,mainProgress(t),left+20,top+64,0xFF9AB6C8);
-        text(g,"DAILY: PREPARATION TO BECOME POWERFUL",left+20,top+82,0xFF7DEBFF);
-        objective(g,"Hostile mobs",t.getInt("daily_kills"),10,top+98);
-        objective(g,"Run blocks",t.getInt("daily_run"),1000,top+113);
-        objective(g,"Push-ups",t.getInt("daily_pushups"),30,top+128);
-        objective(g,"Sit-ups",t.getInt("daily_situps"),30,top+143);
-        objective(g,"Squats",t.getInt("daily_squats"),30,top+158);
-        text(g,t.getBoolean("daily_complete")?"COMPLETE - CLAIM":"IN PROGRESS",left+218,top+82,t.getBoolean("daily_complete")?0xFF61FFAD:0xFFFFD66B);
-        if(t.getBoolean("emergency_active")) text(g,"EMERGENCY: "+t.getInt("emergency_kills")+"/3 KILLS",left+205,top+158,0xFFFF6B7A);
-    }
-    private static String mainProgress(CompoundTag t){return switch(t.getInt("progression_stage")){case 0->"Open System, allocate a stat, claim Daily";case 1->"Dagger damage "+t.getInt("quest_dagger_damage")+" / 500";case 2->"Reach Lv40; kills "+t.getInt("job_change_kills")+" / 25";case 3->"Extract 3 shadows and summon one";case 4->"Reach Lv80 and preserve 10 shadows";default->"All current progression completed";};}
-    private void store(GuiGraphics g,CompoundTag t){text(g,"SYSTEM GOLD: "+t.getInt("gold"),left+20,top+52,0xFFFFD66B);text(g,"Purchases are validated by the server.",left+20,top+68,0xFF9AB6C8);}
-    private void shadows(GuiGraphics g,CompoundTag t){int stored=t.getList("shadows",10).size(),active=t.getList("active_shadows",8).size();String[] modes={"Follow","Guard","Passive","Aggressive"};int mode=Math.floorMod(t.getInt("shadow_mode"),modes.length);text(g,"STORED SHADOWS: "+stored+" / "+shadowCap(t),left+24,top+60,0xFFB69BFF);text(g,"ACTIVE SHADOWS: "+active+"     MODE: "+modes[mode],left+24,top+79,0xFF7DEBFF);text(g,"Nearest death imprint can be extracted with G.",left+24,top+102,0xFFB8CAD8);text(g,"Owner-safe AI prevents friendly fire and duplicate summons.",left+24,top+120,0xFF8795A6);}
-    private void inventory(GuiGraphics g,CompoundTag t,int mouseX,int mouseY){
-        ListTag list=t.getList("system_inventory",Tag.TAG_COMPOUND);
-        int count=list.size(),pages=Math.max(1,(count+INVENTORY_PAGE_SIZE-1)/INVENTORY_PAGE_SIZE);
-        inventoryPage=Math.min(inventoryPage,pages-1);
-        int gridX=left+20,gridY=top+55,hovered=-1;
-        for(int slot=0;slot<INVENTORY_PAGE_SIZE;slot++){
-            int x=gridX+(slot%INVENTORY_COLUMNS)*18,y=gridY+(slot/INVENTORY_COLUMNS)*18;
-            g.fill(x,y,x+18,y+18,0xFF31425C); g.fill(x+1,y+1,x+17,y+17,0xD90B1427);
-            int index=inventoryPage*INVENTORY_PAGE_SIZE+slot;
-            if(index<count){
-                ItemStack stack=ItemStack.of(list.getCompound(index));
-                g.renderItem(stack,x+1,y+1); g.renderItemDecorations(font,stack,x+1,y+1);
-                if(mouseX>=x&&mouseX<x+18&&mouseY>=y&&mouseY<y+18) hovered=index;
+    private void addNavigation() {
+        Tab[] values = Tab.values();
+        if (wideNavigation) {
+            int y = top + 35;
+            for (Tab value : values) {
+                addTabButton(value, left + 10, y, 86, 18);
+                y += 20;
+            }
+        } else {
+            int gap = 2;
+            int buttonWidth = (panelWidth - 24 - gap * 2) / 3;
+            for (int i = 0; i < values.length; i++) {
+                int column = i % 3;
+                int row = i / 3;
+                addTabButton(values[i], left + 12 + column * (buttonWidth + gap), top + 25 + row * 18, buttonWidth, 16);
             }
         }
-        text(g,"SYSTEM INVENTORY",left+197,top+58,0xFF7DEBFF);
-        text(g,count+" / 108 slots",left+197,top+78,0xFFFFFFFF);
-        text(g,"PAGE "+(inventoryPage+1)+" / "+pages,left+197,top+94,0xFFD9C6FF);
-        text(g,"Click an item",left+197,top+119,0xFF9AB6C8);
-        text(g,"to retrieve it.",left+197,top+133,0xFF9AB6C8);
-        text(g,"Storage persists",left+197,top+153,0xFF6FA9C7);
-        text(g,"with hunter data.",left+197,top+167,0xFF6FA9C7);
-        if(hovered>=0) g.renderTooltip(font,ItemStack.of(list.getCompound(hovered)),mouseX,mouseY);
     }
 
-    @Override public boolean mouseClicked(double mouseX,double mouseY,int button){
-        if(button==0&&tab==Tab.INVENTORY&&ClientHunterData.get().getBoolean("awakened")){
-            int gridX=left+20,gridY=top+55;
-            int relX=(int)mouseX-gridX,relY=(int)mouseY-gridY;
-            if(relX>=0&&relY>=0&&relX<INVENTORY_COLUMNS*18&&relY<INVENTORY_ROWS*18){
-                int index=inventoryPage*INVENTORY_PAGE_SIZE+(relY/18)*INVENTORY_COLUMNS+(relX/18);
-                if(index<ClientHunterData.get().getList("system_inventory",Tag.TAG_COMPOUND).size()){
-                    ModNetwork.CHANNEL.sendToServer(new ActionPacket("RETRIEVE_SLOT:"+index));
-                    return true;
+    private void addTabButton(Tab target, int x, int y, int width, int height) {
+        Button button = Button.builder(Component.literal(tabName(target)), ignored -> {
+            tab = target;
+            inventoryPage = 0;
+            rebuildWidgets();
+        }).bounds(x, y, width, height).build();
+        button.active = target != tab;
+        addRenderableWidget(button);
+    }
+
+    private void addStatsButtons() {
+        for (int i = 0; i < STATS.length; i++) {
+            String stat = STATS[i];
+            int y = contentY + 18 + i * statRowStep();
+            Button button = Button.builder(Component.literal("+"), ignored -> send("ALLOCATE:" + stat))
+                    .bounds(contentX + contentWidth - 22, y - 3, 18, 16).build();
+            actionButtons.put("stat:" + stat, button);
+            addRenderableWidget(button);
+        }
+    }
+
+    private void addSkillButtons() {
+        Button activate = Button.builder(Component.literal("ACTIVATE"), ignored -> {
+            if (isActiveSkill(selectedSkill)) send("ABILITY:" + selectedSkill);
+            else SystemUi.Notifications.pushFailure("This skill is passive or controlled elsewhere");
+        }).bounds(contentX, contentY + contentHeight - 20, Math.min(105, contentWidth), 18).build();
+        actionButtons.put("activate_skill", activate);
+        addRenderableWidget(activate);
+    }
+
+    private void addQuestButtons() {
+        int y = contentY + contentHeight - 20;
+        int claimWidth = Math.min(72, Math.max(56, contentWidth / 4));
+        int remaining = contentWidth - claimWidth - 6;
+        int exerciseWidth = Math.max(42, remaining / 3);
+        String[] names = {"Push-up", "Sit-up", "Squat"};
+        String[] ids = {"pushup", "situp", "squat"};
+        for (int i = 0; i < 3; i++) {
+            int index = i;
+            Button button = Button.builder(Component.literal(names[i]), ignored -> send("EXERCISE:" + ids[index]))
+                    .bounds(contentX + i * exerciseWidth, y, exerciseWidth - 2, 18).build();
+            addRenderableWidget(button);
+        }
+        Button claim = Button.builder(Component.literal("CLAIM"), ignored -> send("CLAIM_DAILY"))
+                .bounds(contentX + contentWidth - claimWidth, y, claimWidth, 18).build();
+        actionButtons.put("claim_daily", claim);
+        addRenderableWidget(claim);
+    }
+
+    private void addStoreButtons() {
+        int columns = contentWidth >= 270 ? 2 : 1;
+        int buttonWidth = (contentWidth - (columns - 1) * 5) / columns;
+        int rowHeight = 22;
+        for (int i = 0; i < STORE_IDS.length; i++) {
+            int column = i % columns;
+            int row = i / columns;
+            String id = STORE_IDS[i];
+            int price = STORE_PRICES[i];
+            Button button = Button.builder(Component.literal(SystemUi.titleCase(id) + "  " + price + "G"), ignored -> send("BUY:" + id))
+                    .bounds(contentX + column * (buttonWidth + 5), contentY + 20 + row * rowHeight, buttonWidth, 20).build();
+            storeButtons.add(new StoreButton(button, price));
+            addRenderableWidget(button);
+        }
+    }
+
+    private void addInventoryButtons() {
+        int y = contentY + contentHeight - 20;
+        Button store = Button.builder(Component.literal("STORE HELD"), ignored -> send("STORE_HELD"))
+                .bounds(contentX, y, Math.min(102, contentWidth / 2), 18).build();
+        Button previous = Button.builder(Component.literal("<"), ignored -> {
+            inventoryPage = Math.max(0, inventoryPage - 1);
+            refreshButtonStates();
+        }).bounds(contentX + contentWidth - 48, y, 22, 18).build();
+        Button next = Button.builder(Component.literal(">"), ignored -> {
+            inventoryPage = Math.min(maxInventoryPage(ClientHunterData.view()), inventoryPage + 1);
+            refreshButtonStates();
+        }).bounds(contentX + contentWidth - 23, y, 22, 18).build();
+        actionButtons.put("store_held", store);
+        actionButtons.put("inventory_previous", previous);
+        actionButtons.put("inventory_next", next);
+        addRenderableWidget(store);
+        addRenderableWidget(previous);
+        addRenderableWidget(next);
+    }
+
+    private void addShadowButtons() {
+        String[] labels = {"EXTRACT", "SUMMON", "DISMISS", "EXCHANGE", "DOMAIN", "MODE"};
+        String[] actions = {"EXTRACT", "SUMMON_SHADOW", "DISMISS_SHADOWS", "SHADOW_EXCHANGE", "TOGGLE_DOMAIN", "SHADOW_MODE"};
+        int columns = contentWidth >= 270 ? 3 : 2;
+        int buttonWidth = (contentWidth - (columns - 1) * 4) / columns;
+        for (int i = 0; i < labels.length; i++) {
+            int index = i;
+            int column = i % columns;
+            int row = i / columns;
+            Button button = Button.builder(Component.literal(labels[i]), ignored -> send(actions[index]))
+                    .bounds(contentX + column * (buttonWidth + 4), contentY + contentHeight - 44 + row * 22, buttonWidth, 18).build();
+            actionButtons.put("shadow:" + actions[i], button);
+            addRenderableWidget(button);
+        }
+    }
+
+    private void addSettingsButtons() {
+        int columns = contentWidth >= 270 ? 2 : 1;
+        int buttonWidth = (contentWidth - (columns - 1) * 5) / columns;
+        addSettingButton(0, columns, buttonWidth, () -> "SERVER HUD: " + onOff(ClientHunterData.view().hudEnabled()), () -> send("TOGGLE_HUD"));
+        addSettingButton(1, columns, buttonWidth, () -> "QUEST TRACKER: " + onOff(SystemUi.Settings.showQuestTracker()), SystemUi.Settings::toggleQuestTracker);
+        addSettingButton(2, columns, buttonWidth, () -> "COOLDOWNS: " + onOff(SystemUi.Settings.showCooldowns()), SystemUi.Settings::toggleCooldowns);
+        addSettingButton(3, columns, buttonWidth, () -> "NOTIFICATIONS: " + onOff(SystemUi.Settings.showNotifications()), SystemUi.Settings::toggleNotifications);
+        addSettingButton(4, columns, buttonWidth, () -> "COMPACT: " + onOff(SystemUi.Settings.compactHud()), SystemUi.Settings::toggleCompactHud);
+        addSettingButton(5, columns, buttonWidth, () -> "ANCHOR: " + SystemUi.titleCase(SystemUi.Settings.anchor().name()), SystemUi.Settings::cycleAnchor);
+        addSettingButton(6, columns, buttonWidth, () -> "SCALE -", () -> SystemUi.Settings.adjustScale(-5));
+        addSettingButton(7, columns, buttonWidth, () -> "SCALE +", () -> SystemUi.Settings.adjustScale(5));
+    }
+
+    private void addSettingButton(int index, int columns, int buttonWidth, LabelSupplier label, Runnable action) {
+        int column = index % columns;
+        int row = index / columns;
+        Button button = Button.builder(Component.literal(label.get()), ignored -> {
+            action.run();
+            rebuildWidgets();
+        }).bounds(contentX + column * (buttonWidth + 5), contentY + 14 + row * 19, buttonWidth, 17).build();
+        addRenderableWidget(button);
+    }
+
+    @Override
+    public void tick() {
+        if (lastAwakened != ClientHunterData.awakened()) {
+            rebuildWidgets();
+            return;
+        }
+        refreshButtonStates();
+    }
+
+    private void refreshButtonStates() {
+        SystemUi.Data data = ClientHunterData.view();
+        for (String stat : STATS) {
+            Button button = actionButtons.get("stat:" + stat);
+            if (button != null) button.active = data.statPoints() > 0;
+        }
+        Button activate = actionButtons.get("activate_skill");
+        if (activate != null) {
+            boolean activeSkill = isActiveSkill(selectedSkill);
+            boolean unlocked = data.skillUnlocked(selectedSkill);
+            activate.active = activeSkill && unlocked && data.cooldownRemaining(selectedSkill) <= 0L;
+            activate.setMessage(Component.literal(activeSkill ? (data.cooldownRemaining(selectedSkill) > 0L ? SystemUi.Cooldowns.remainingText(data, selectedSkill) : "ACTIVATE") : "PASSIVE"));
+        }
+        Button claim = actionButtons.get("claim_daily");
+        if (claim != null) claim.active = data.dailyComplete() && !data.dailyClaimed();
+        for (StoreButton entry : storeButtons) entry.button.active = data.gold() >= entry.price && data.compounds("system_inventory").size() < 108;
+        Button storeHeld = actionButtons.get("store_held");
+        if (storeHeld != null) {
+            Minecraft minecraft = Minecraft.getInstance();
+            storeHeld.active = minecraft.player != null && !minecraft.player.getMainHandItem().isEmpty()
+                    && data.compounds("system_inventory").size() < 108;
+        }
+        Button previous = actionButtons.get("inventory_previous");
+        Button next = actionButtons.get("inventory_next");
+        int maximumPage = maxInventoryPage(data);
+        inventoryPage = Math.min(inventoryPage, maximumPage);
+        if (previous != null) previous.active = inventoryPage > 0;
+        if (next != null) next.active = inventoryPage < maximumPage;
+
+        setActive("shadow:EXTRACT", data.skillUnlocked("shadow_extraction") && data.cooldownRemaining("shadow_extraction") <= 0L);
+        setActive("shadow:SUMMON_SHADOW", data.skillUnlocked("shadow_preservation") && !data.compounds("shadows").isEmpty());
+        setActive("shadow:DISMISS_SHADOWS", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_EXCHANGE", data.skillUnlocked("shadow_exchange") && !data.strings("active_shadows").isEmpty() && data.cooldownRemaining("shadow_exchange") <= 0L);
+        setActive("shadow:TOGGLE_DOMAIN", data.skillUnlocked("monarch_domain"));
+        setActive("shadow:SHADOW_MODE", !data.compounds("shadows").isEmpty());
+    }
+
+    private void setActive(String key, boolean active) {
+        Button button = actionButtons.get(key);
+        if (button != null) button.active = active;
+    }
+
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        renderBackground(graphics);
+        SystemUi.Theme.panel(graphics, left, top, panelWidth, panelHeight);
+        graphics.drawCenteredString(font, "SYSTEM", left + panelWidth / 2, top + 10, SystemUi.Theme.CYAN);
+        if (!ClientHunterData.awakened()) {
+            graphics.drawCenteredString(font, "A dormant interface is awaiting authorization.", left + panelWidth / 2,
+                    top + panelHeight / 2 - 32, SystemUi.Theme.TEXT_DIM);
+            super.render(graphics, mouseX, mouseY, partialTick);
+            return;
+        }
+
+        renderSectionTitle(graphics);
+        SystemUi.Data data = ClientHunterData.view();
+        switch (tab) {
+            case HOME -> renderHome(graphics, data);
+            case STATUS -> renderStats(graphics, data);
+            case SKILLS -> renderSkills(graphics, data, mouseX, mouseY);
+            case QUESTS -> renderQuests(graphics, data);
+            case STORE -> renderStore(graphics, data);
+            case EQUIPMENT -> renderEquipment(graphics, data, mouseX, mouseY);
+            case INVENTORY -> renderInventory(graphics, data, mouseX, mouseY);
+            case SHADOWS -> renderShadows(graphics, data);
+            case SETTINGS -> renderSettings(graphics, data);
+        }
+        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    private void renderSectionTitle(GuiGraphics graphics) {
+        graphics.drawString(font, tabName(tab).toUpperCase(Locale.ROOT), contentX, contentY - 15, SystemUi.Theme.TEXT, false);
+        graphics.fill(contentX, contentY - 5, contentX + contentWidth, contentY - 4, 0x6635D9FF);
+    }
+
+    private void renderHome(GuiGraphics graphics, SystemUi.Data data) {
+        int cardHeight = Math.max(24, Math.min(44, (contentHeight - 8) / 3));
+        homeCard(graphics, contentY, "HUNTER", "Level " + data.level() + "  •  " + data.rank());
+        homeCard(graphics, contentY + cardHeight + 4, "ACTIVE QUEST", data.activeQuestName() + " — " + data.activeQuestProgress());
+        homeCard(graphics, contentY + (cardHeight + 4) * 2, "SYSTEM", data.compounds("system_inventory").size() + "/108 items  •  "
+                + data.compounds("shadows").size() + "/" + data.shadowCapacity() + " shadows");
+    }
+
+    private void homeCard(GuiGraphics graphics, int y, String heading, String detail) {
+        int height = Math.max(24, Math.min(44, (contentHeight - 8) / 3));
+        SystemUi.Theme.inset(graphics, contentX, y, contentWidth, height);
+        graphics.drawString(font, heading, contentX + 7, y + 7, SystemUi.Theme.CYAN, false);
+        graphics.drawString(font, SystemUi.Theme.ellipsize(font, detail, contentWidth - 14), contentX + 7, y + 20, SystemUi.Theme.TEXT_DIM, false);
+    }
+
+    private void renderStats(GuiGraphics graphics, SystemUi.Data data) {
+        graphics.drawString(font, "Level " + data.level() + "   " + data.rank(), contentX, contentY + 2, SystemUi.Theme.CYAN, false);
+        graphics.drawString(font, "Unspent points: " + data.statPoints(), contentX + contentWidth - font.width("Unspent points: " + data.statPoints()),
+                contentY + 2, data.statPoints() > 0 ? SystemUi.Theme.WARNING : SystemUi.Theme.TEXT_DIM, false);
+        for (int i = 0; i < STATS.length; i++) {
+            String stat = STATS[i];
+            int y = contentY + 18 + i * statRowStep();
+            SystemUi.Theme.inset(graphics, contentX, y - 4, contentWidth, 18);
+            graphics.drawString(font, SystemUi.titleCase(stat), contentX + 7, y, SystemUi.Theme.TEXT, false);
+            String value = Integer.toString(data.stat(stat));
+            graphics.drawString(font, value, contentX + contentWidth - 48 - font.width(value), y, SystemUi.Theme.CYAN, false);
+        }
+        if (contentHeight >= 150) {
+            graphics.drawString(font, "Mana " + data.mana() + " / " + data.maxMana(), contentX, contentY + 129, SystemUi.Theme.VIOLET, false);
+            graphics.drawString(font, "Job: " + data.text("job", "None") + "   Title: " + data.text("title", "The Player"), contentX, contentY + 143, SystemUi.Theme.TEXT_DIM, false);
+        }
+    }
+
+    private void renderSkills(GuiGraphics graphics, SystemUi.Data data, int mouseX, int mouseY) {
+        int listBottom = contentY + contentHeight - 25;
+        int rowHeight = 21;
+        int visible = Math.max(1, (listBottom - contentY) / rowHeight);
+        int maximum = Math.max(0, HunterData.SKILLS.length - visible);
+        int scroll = clampScroll(maximum);
+        graphics.enableScissor(contentX, contentY, contentX + contentWidth, listBottom);
+        for (int row = 0; row < visible && row + scroll < HunterData.SKILLS.length; row++) {
+            String skill = HunterData.SKILLS[row + scroll];
+            int y = contentY + row * rowHeight;
+            boolean selected = skill.equals(selectedSkill);
+            boolean unlocked = data.skillUnlocked(skill);
+            graphics.fill(contentX, y, contentX + contentWidth, y + 19, selected ? 0x88365A86 : 0x66070D1B);
+            graphics.fill(contentX, y, contentX + 2, y + 19, unlocked ? SystemUi.Theme.CYAN : 0xFF39465A);
+            graphics.drawString(font, SystemUi.Theme.ellipsize(font, SystemUi.titleCase(skill), contentWidth - 85), contentX + 7, y + 6,
+                    unlocked ? SystemUi.Theme.TEXT : SystemUi.Theme.TEXT_DIM, false);
+            String state = !unlocked ? "LOCKED" : (data.cooldownRemaining(skill) > 0L ? SystemUi.Cooldowns.remainingText(data, skill) : (isActiveSkill(skill) ? "READY" : "PASSIVE"));
+            graphics.drawString(font, state, contentX + contentWidth - font.width(state) - 6, y + 6,
+                    !unlocked ? SystemUi.Theme.TEXT_DIM : data.cooldownRemaining(skill) > 0L ? SystemUi.Theme.WARNING : SystemUi.Theme.SUCCESS, false);
+        }
+        graphics.disableScissor();
+        if (maximum > 0) renderScrollBar(graphics, contentX + contentWidth - 3, contentY, listBottom - contentY, scroll, maximum);
+    }
+
+    private void renderQuests(GuiGraphics graphics, SystemUi.Data data) {
+        int viewportHeight = Math.max(30, contentHeight - 25);
+        int totalHeight = 154;
+        int maximum = Math.max(0, totalHeight - viewportHeight);
+        int scroll = Math.max(0, Math.min(maximum, scrollOffsets.getOrDefault(tab, 0)));
+        scrollOffsets.put(tab, scroll);
+        int y = contentY - scroll;
+        graphics.enableScissor(contentX, contentY, contentX + contentWidth, contentY + viewportHeight);
+        SystemUi.Theme.inset(graphics, contentX, y, contentWidth, 34);
+        graphics.drawString(font, data.activeQuestName(), contentX + 7, y + 6, SystemUi.Theme.VIOLET, false);
+        graphics.drawString(font, SystemUi.Theme.ellipsize(font, data.activeQuestProgress(), contentWidth - 14), contentX + 7, y + 19, SystemUi.Theme.TEXT_DIM, false);
+        y += 40;
+        graphics.drawString(font, "DAILY — PREPARATION TO BECOME POWERFUL", contentX, y, SystemUi.Theme.CYAN, false);
+        y += 14;
+        objective(graphics, y, "Hostile mobs", data.raw().getInt("daily_kills"), 10); y += 14;
+        objective(graphics, y, "Run blocks", data.raw().getInt("daily_run"), 1000); y += 14;
+        objective(graphics, y, "Push-ups", data.raw().getInt("daily_pushups"), 30); y += 14;
+        objective(graphics, y, "Sit-ups", data.raw().getInt("daily_situps"), 30); y += 14;
+        objective(graphics, y, "Squats", data.raw().getInt("daily_squats"), 30); y += 16;
+        String state = data.dailyClaimed() ? "REWARD CLAIMED" : data.dailyComplete() ? "COMPLETE — CLAIM AVAILABLE" : "IN PROGRESS";
+        graphics.drawString(font, state, contentX, y, data.dailyComplete() ? SystemUi.Theme.SUCCESS : SystemUi.Theme.WARNING, false);
+        if (data.raw().getBoolean("emergency_active")) {
+            graphics.drawString(font, "EMERGENCY QUEST: " + data.raw().getInt("emergency_kills") + " / 3 kills", contentX, y + 14, SystemUi.Theme.FAILURE, false);
+        }
+        graphics.disableScissor();
+        if (maximum > 0) renderScrollBar(graphics, contentX + contentWidth - 3, contentY, viewportHeight, scroll, maximum);
+    }
+
+    private void objective(GuiGraphics graphics, int y, String label, int value, int target) {
+        int safe = Math.max(0, Math.min(value, target));
+        String text = label + "  " + safe + " / " + target;
+        graphics.drawString(font, text, contentX + 6, y, safe >= target ? SystemUi.Theme.SUCCESS : SystemUi.Theme.TEXT, false);
+    }
+
+    private void renderStore(GuiGraphics graphics, SystemUi.Data data) {
+        graphics.drawString(font, "System gold: " + data.gold(), contentX, contentY + 4, SystemUi.Theme.WARNING, false);
+        graphics.drawString(font, "Purchases are validated and stored by the server.", contentX, contentY + 17, SystemUi.Theme.TEXT_DIM, false);
+        if (data.compounds("system_inventory").size() >= 108) {
+            graphics.drawString(font, "System inventory is full.", contentX, contentY + contentHeight - 10, SystemUi.Theme.FAILURE, false);
+        }
+    }
+
+    private void renderEquipment(GuiGraphics graphics, SystemUi.Data data, int mouseX, int mouseY) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player == null) {
+            graphics.drawString(font, "Player equipment is unavailable.", contentX, contentY + 8, SystemUi.Theme.FAILURE, false);
+            return;
+        }
+        boolean sideBySide = contentWidth >= 310;
+        int totalHeight = sideBySide ? 116 : 196;
+        int maximum = Math.max(0, totalHeight - contentHeight);
+        int scroll = Math.max(0, Math.min(maximum, scrollOffsets.getOrDefault(tab, 0)));
+        scrollOffsets.put(tab, scroll);
+        int originY = contentY - scroll;
+        graphics.enableScissor(contentX, contentY, contentX + contentWidth, contentY + contentHeight);
+        String[] labels = {"Helmet", "Chest", "Legs", "Boots"};
+        int[] armorSlots = {3, 2, 1, 0};
+        for (int i = 0; i < labels.length; i++) {
+            int y = originY + i * 28;
+            ItemStack stack = minecraft.player.getInventory().armor.get(armorSlots[i]);
+            SystemUi.Theme.inset(graphics, contentX, y, Math.min(220, contentWidth), 24);
+            graphics.renderItem(stack, contentX + 4, y + 4);
+            String name = stack.isEmpty() ? "Empty" : stack.getHoverName().getString();
+            graphics.drawString(font, labels[i] + ": " + SystemUi.Theme.ellipsize(font, name, Math.min(220, contentWidth) - 60), contentX + 25, y + 8,
+                    stack.isEmpty() ? SystemUi.Theme.TEXT_DIM : SystemUi.Theme.TEXT, false);
+            if (!stack.isEmpty() && mouseX >= contentX && mouseX < contentX + Math.min(220, contentWidth)
+                    && mouseY >= Math.max(contentY, y) && mouseY < Math.min(contentY + contentHeight, y + 24)) {
+                graphics.renderTooltip(font, stack, mouseX, mouseY);
+            }
+        }
+        int accessoryX = sideBySide ? contentX + 232 : contentX;
+        int accessoryY = sideBySide ? originY : originY + 116;
+        String[] slots = {"hands", "earring", "necklace", "ring"};
+        for (int i = 0; i < slots.length; i++) {
+            String value = data.raw().getString("accessory_" + slots[i]);
+            int availableWidth = Math.max(80, contentWidth - (accessoryX - contentX) - 10);
+            graphics.drawString(font, SystemUi.titleCase(slots[i]) + ": " + SystemUi.Theme.ellipsize(font,
+                    value.isBlank() ? "Empty" : SystemUi.titleCase(value), availableWidth),
+                    accessoryX, accessoryY + i * 18, value.isBlank() ? SystemUi.Theme.TEXT_DIM : SystemUi.Theme.VIOLET, false);
+        }
+        graphics.drawString(font, "Accessories equip when their item is used.", contentX, originY + totalHeight - 12, SystemUi.Theme.TEXT_DIM, false);
+        graphics.disableScissor();
+        if (maximum > 0) renderScrollBar(graphics, contentX + contentWidth - 3, contentY, contentHeight, scroll, maximum);
+    }
+
+    private void renderInventory(GuiGraphics graphics, SystemUi.Data data, int mouseX, int mouseY) {
+        ListTag list = data.compounds("system_inventory");
+        int columns = inventoryColumns();
+        int rows = inventoryRows();
+        int pageSize = columns * rows;
+        int start = inventoryPage * pageSize;
+        int hovered = -1;
+        for (int slot = 0; slot < pageSize; slot++) {
+            int x = contentX + (slot % columns) * 20;
+            int y = contentY + (slot / columns) * 20;
+            SystemUi.Theme.inset(graphics, x, y, 18, 18);
+            int index = start + slot;
+            if (index < list.size()) {
+                ItemStack stack = ItemStack.of(list.getCompound(index));
+                if (!stack.isEmpty()) {
+                    graphics.renderItem(stack, x + 1, y + 1);
+                    graphics.renderItemDecorations(font, stack, x + 1, y + 1);
+                    if (mouseX >= x && mouseX < x + 18 && mouseY >= y && mouseY < y + 18) hovered = index;
                 }
             }
         }
-        return super.mouseClicked(mouseX,mouseY,button);
+        int summaryX = contentX + columns * 20 + 5;
+        if (summaryX + 70 < contentX + contentWidth) {
+            graphics.drawString(font, list.size() + " / 108", summaryX, contentY + 2, SystemUi.Theme.CYAN, false);
+            graphics.drawString(font, "Page " + (inventoryPage + 1) + " / " + (maxInventoryPage(data) + 1), summaryX, contentY + 17, SystemUi.Theme.TEXT_DIM, false);
+            graphics.drawString(font, "Click an item", summaryX, contentY + 40, SystemUi.Theme.TEXT_DIM, false);
+            graphics.drawString(font, "to retrieve it.", summaryX, contentY + 53, SystemUi.Theme.TEXT_DIM, false);
+        }
+        if (list.isEmpty()) graphics.drawCenteredString(font, "System inventory is empty", contentX + Math.min(contentWidth, columns * 20) / 2, contentY + rows * 10 - 4, SystemUi.Theme.TEXT_DIM);
+        if (hovered >= 0) graphics.renderTooltip(font, ItemStack.of(list.getCompound(hovered)), mouseX, mouseY);
     }
-    private void objective(GuiGraphics g,String name,int value,int target,int y){text(g,name+": "+Math.min(value,target)+" / "+target,left+35,y,value>=target?0xFF61FFAD:0xFFFFFFFF);}
-    private static void panel(GuiGraphics g,int x,int y,int w,int h){g.fill(x,y,x+w,y+h,0xE7081024);g.fill(x,y,x+w,y+2,0xFF3ADFFF);g.fill(x,y+h-2,x+w,y+h,0xFF724CFF);g.fill(x,y,x+2,y+h,0xFF3ADFFF);g.fill(x+w-2,y,x+w,y+h,0xFF724CFF);}
-    private void text(GuiGraphics g,String s,int x,int y,int color){g.drawString(font,s,x,y,color,false);}
-    private static int shadowCap(CompoundTag t){return Math.min(100,3+Math.max(1,t.getInt("intelligence"))/5+Math.max(1,t.getInt("level"))/10+t.getInt("shadow_capacity_bonus")+(t.getBoolean("black_heart")?20:0));}
-    private static String rank(int l,boolean heart){if(l>=100&&heart)return"SHADOW MONARCH";if(l>=80)return"NATIONAL";if(l>=60)return"S";if(l>=40)return"A";if(l>=30)return"B";if(l>=20)return"C";if(l>=10)return"D";return"E";}
-    private static String blank(String s,String fallback){return s==null||s.isBlank()?fallback:s;}
-    private static String capitalize(String s){return s.isEmpty()?s:Character.toUpperCase(s.charAt(0))+s.substring(1);}
-    private static String shortName(Tab t){return switch(t){case STATUS->"Status";case SKILLS->"Skills";case QUESTS->"Quests";case STORE->"Store";case SHADOWS->"Shadows";case INVENTORY->"Items";};}
-    private static void send(String action,String value,int amount){
-        String packet = switch(action) {
-            case "awaken" -> "AWAKEN";
-            case "allocate" -> "ALLOCATE:" + value;
-            case "exercise" -> "EXERCISE:" + value;
-            case "quest" -> "CLAIM_DAILY";
-            case "buy" -> "BUY:" + value;
-            case "inventory" -> value.equals("store") ? "STORE_HELD" : "RETRIEVE_FIRST";
-            case "shadow" -> switch(value) { case "extract" -> "EXTRACT"; case "summon" -> "SUMMON_SHADOW"; case "dismiss" -> "DISMISS_SHADOWS"; case "exchange" -> "SHADOW_EXCHANGE"; case "mode" -> "SHADOW_MODE"; default -> "TOGGLE_DOMAIN"; };
-            case "authority" -> "AUTHORITY:" + value;
-            default -> action.toUpperCase(Locale.ROOT) + (value.isEmpty() ? "" : ":" + value);
+
+    private void renderShadows(GuiGraphics graphics, SystemUi.Data data) {
+        ListTag shadows = data.compounds("shadows");
+        int headerHeight = 35;
+        graphics.drawString(font, "Stored " + shadows.size() + " / " + data.shadowCapacity() + "   Active " + data.strings("active_shadows").size(),
+                contentX, contentY + 2, SystemUi.Theme.VIOLET, false);
+        String[] modes = {"Follow", "Guard", "Passive", "Aggressive"};
+        graphics.drawString(font, "Mode: " + modes[Math.floorMod(data.raw().getInt("shadow_mode"), modes.length)], contentX, contentY + 16, SystemUi.Theme.TEXT_DIM, false);
+        int listTop = contentY + headerHeight;
+        int listBottom = contentY + contentHeight - 48;
+        int rowHeight = 24;
+        int visible = Math.max(1, (listBottom - listTop) / rowHeight);
+        int maximum = Math.max(0, shadows.size() - visible);
+        int scroll = clampScroll(maximum);
+        graphics.enableScissor(contentX, listTop, contentX + contentWidth, listBottom);
+        for (int row = 0; row < visible && row + scroll < shadows.size(); row++) {
+            CompoundTag shadow = shadows.getCompound(row + scroll);
+            int y = listTop + row * rowHeight;
+            SystemUi.Theme.inset(graphics, contentX, y, contentWidth, 21);
+            String name = shadow.getString("name").isBlank() ? "Unnamed Shadow" : shadow.getString("name");
+            graphics.drawString(font, SystemUi.Theme.ellipsize(font, name, contentWidth - 95), contentX + 6, y + 6, SystemUi.Theme.TEXT, false);
+            String details = "Lv" + Math.max(1, shadow.getInt("level")) + " " + (shadow.getString("rank").isBlank() ? "Normal" : shadow.getString("rank"));
+            graphics.drawString(font, details, contentX + contentWidth - font.width(details) - 6, y + 6, SystemUi.Theme.CYAN, false);
+        }
+        graphics.disableScissor();
+        if (shadows.isEmpty()) graphics.drawCenteredString(font, "No preserved shadows", contentX + contentWidth / 2, listTop + 18, SystemUi.Theme.TEXT_DIM);
+        if (maximum > 0) renderScrollBar(graphics, contentX + contentWidth - 3, listTop, listBottom - listTop, scroll, maximum);
+    }
+
+    private void renderSettings(GuiGraphics graphics, SystemUi.Data data) {
+        graphics.drawString(font, "Local HUD presentation settings are stored in the client config folder.", contentX, contentY + 4, SystemUi.Theme.TEXT_DIM, false);
+        graphics.drawString(font, "Scale: " + SystemUi.Settings.hudScale() + "%", contentX, contentY + contentHeight - 25, SystemUi.Theme.CYAN, false);
+        graphics.drawString(font, "Server HUD controls whether the synchronized overlay is visible.", contentX, contentY + contentHeight - 12, SystemUi.Theme.TEXT_DIM, false);
+    }
+
+    private void renderScrollBar(GuiGraphics graphics, int x, int y, int height, int scroll, int maximum) {
+        graphics.fill(x, y, x + 2, y + height, 0x552A3B52);
+        int thumb = Math.max(8, height / Math.max(2, maximum + 1));
+        int offset = maximum == 0 ? 0 : Math.round((height - thumb) * (scroll / (float)maximum));
+        graphics.fill(x, y + offset, x + 2, y + offset + thumb, SystemUi.Theme.CYAN);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && ClientHunterData.awakened()) {
+            if (tab == Tab.SKILLS && clickSkill(mouseX, mouseY)) return true;
+            if (tab == Tab.INVENTORY && clickInventory(mouseX, mouseY)) return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean clickSkill(double mouseX, double mouseY) {
+        int listBottom = contentY + contentHeight - 25;
+        if (mouseX < contentX || mouseX >= contentX + contentWidth || mouseY < contentY || mouseY >= listBottom) return false;
+        int visible = Math.max(1, (listBottom - contentY) / 21);
+        int maximum = Math.max(0, HunterData.SKILLS.length - visible);
+        int index = clampScroll(maximum) + ((int)mouseY - contentY) / 21;
+        if (index < 0 || index >= HunterData.SKILLS.length) return false;
+        selectedSkill = HunterData.SKILLS[index];
+        refreshButtonStates();
+        return true;
+    }
+
+    private boolean clickInventory(double mouseX, double mouseY) {
+        int columns = inventoryColumns();
+        int rows = inventoryRows();
+        int gridWidth = columns * 20;
+        int gridHeight = rows * 20;
+        int relativeX = (int)mouseX - contentX;
+        int relativeY = (int)mouseY - contentY;
+        if (relativeX < 0 || relativeY < 0 || relativeX >= gridWidth || relativeY >= gridHeight) return false;
+        int column = relativeX / 20;
+        int row = relativeY / 20;
+        if (relativeX % 20 >= 18 || relativeY % 20 >= 18) return false;
+        int index = inventoryPage * columns * rows + row * columns + column;
+        if (index >= ClientHunterData.view().compounds("system_inventory").size()) return false;
+        send("RETRIEVE_SLOT:" + index);
+        return true;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (tab == Tab.SKILLS || tab == Tab.SHADOWS) {
+            int current = scrollOffsets.getOrDefault(tab, 0);
+            scrollOffsets.put(tab, Math.max(0, current + (delta > 0 ? -1 : 1)));
+            return true;
+        }
+        if (tab == Tab.QUESTS || tab == Tab.EQUIPMENT) {
+            int current = scrollOffsets.getOrDefault(tab, 0);
+            scrollOffsets.put(tab, Math.max(0, current + (delta > 0 ? -12 : 12)));
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, delta);
+    }
+
+    private int clampScroll(int maximum) {
+        int value = Math.max(0, Math.min(maximum, scrollOffsets.getOrDefault(tab, 0)));
+        scrollOffsets.put(tab, value);
+        return value;
+    }
+
+    private int statRowStep() {
+        return Math.max(14, Math.min(20, Math.max(14, contentHeight - 24) / 5));
+    }
+
+    private int inventoryColumns() {
+        int available = Math.max(80, contentWidth - (contentWidth >= 260 ? 90 : 0));
+        return Math.max(4, Math.min(9, available / 20));
+    }
+
+    private int inventoryRows() {
+        return Math.max(2, Math.min(6, Math.max(40, contentHeight - 25) / 20));
+    }
+
+    private int maxInventoryPage(SystemUi.Data data) {
+        int pageSize = Math.max(1, inventoryColumns() * inventoryRows());
+        int count = data.compounds("system_inventory").size();
+        return Math.max(0, (count - 1) / pageSize);
+    }
+
+    private static boolean isActiveSkill(String skill) {
+        for (String value : ACTIVE_SKILLS) if (value.equals(skill)) return true;
+        return false;
+    }
+
+    private static String onOff(boolean value) { return value ? "ON" : "OFF"; }
+
+    private static String tabName(Tab tab) {
+        return switch (tab) {
+            case HOME -> "Main";
+            case STATUS -> "Stats";
+            case SKILLS -> "Skills";
+            case QUESTS -> "Quests";
+            case STORE -> "Store";
+            case EQUIPMENT -> "Equipment";
+            case INVENTORY -> "Inventory";
+            case SHADOWS -> "Shadows";
+            case SETTINGS -> "HUD Settings";
         };
-        ModNetwork.CHANNEL.sendToServer(new ActionPacket(packet));
     }
-    @Override public boolean isPauseScreen(){return false;}
+
+    private static void send(String action) {
+        ModNetwork.CHANNEL.sendToServer(new ActionPacket(action));
+    }
+
+    @Override
+    public boolean isPauseScreen() { return false; }
+
+    private record StoreButton(Button button, int price) { }
+    @FunctionalInterface private interface LabelSupplier { String get(); }
 }

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "sololeveling:barukas_dagger"
+    },
+    {
+      "item": "sololeveling:shadow_silk"
+    },
+    {
+      "item": "sololeveling:reinforcement_core"
+    }
+  ],
+  "result": {
+    "item": "sololeveling:moonshadow_dagger",
+    "count": 1
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "sololeveling:training_dagger"
+    },
+    {
+      "item": "sololeveling:enchanted_steel"
+    },
+    {
+      "item": "sololeveling:reinforcement_core"
+    }
+  ],
+  "result": {
+    "item": "sololeveling:knight_killer",
+    "count": 1
+  }
+}

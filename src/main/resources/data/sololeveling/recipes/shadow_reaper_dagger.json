@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "sololeveling:moonshadow_dagger"
+    },
+    {
+      "item": "sololeveling:enchanted_steel"
+    },
+    {
+      "item": "sololeveling:reinforcement_core"
+    },
+    {
+      "item": "sololeveling:reinforcement_core"
+    }
+  ],
+  "result": {
+    "item": "sololeveling:shadow_reaper_dagger",
+    "count": 1
+  }
+}

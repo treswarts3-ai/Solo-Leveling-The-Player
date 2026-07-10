@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "sololeveling:equipment_fragment"
+    },
+    {
+      "item": "sololeveling:equipment_fragment"
+    },
+    {
+      "item": "sololeveling:equipment_fragment"
+    },
+    {
+      "item": "sololeveling:mana_crystal"
+    }
+  ],
+  "result": {
+    "item": "sololeveling:reinforcement_core",
+    "count": 1
+  }
+}
