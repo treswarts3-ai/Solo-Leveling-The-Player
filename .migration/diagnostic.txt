@@ -1,7 +1,7 @@
 decode_status=0
-actual_sha=869b811ffdc57d51c5411a02a07de7a4651b913dec6a0c7a2455eeb7842a6df3
+actual_sha=987c48a6d25b1487aa5c8f0fcf7dd11a59898dbca0326f36ff05b6dfb01880f9
 expected_sha=95c469f9eeae7da50d8f54d0975f76f205257f8872c20e4e0188069e6e6faa44
-actual_size=58751
+actual_size=60334
 tar_status=2
 tar_error= gzip: stdin: invalid compressed data--crc error tar: Child returned status 1 tar: Error is not recoverable: exiting now 
 first_entry=solo-migration-min/
