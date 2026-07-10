@@ -61,15 +61,15 @@ public final class StandardAbilities {
         }
     }
 
-    private static AbilityDefinition definition(String id, String name, String description, String category,
-                                                AbilityUnlock unlock, int mana, int cooldown, double range,
-                                                AbilityScaling scaling) {
+    private static AbilityDefinition spec(String id, String name, String description, String category,
+                                          AbilityUnlock unlock, int mana, int cooldown, double range,
+                                          AbilityScaling scaling) {
         return new AbilityDefinition(id, name, description, category, unlock, mana, cooldown, range, scaling);
     }
 
     private static final class DashAbility extends BaseAbility {
         private DashAbility() {
-            super(definition("dash", "Dash", "A short agility-scaled burst in the facing direction.", "movement",
+            super(spec("dash", "Dash", "A short agility-scaled burst in the facing direction.", "movement",
                     AbilityUnlock.awakened(), 12, 50, 0.0D, new AbilityScaling(0, 0.01D, 0, 0, 0)));
         }
 
@@ -87,7 +87,7 @@ public final class StandardAbilities {
 
     private static final class QuicksilverAbility extends BaseAbility {
         private QuicksilverAbility() {
-            super(definition("quicksilver", "Quicksilver", "Temporarily heightens movement speed and jumping.", "movement",
+            super(spec("quicksilver", "Quicksilver", "Temporarily heightens movement speed and jumping.", "movement",
                     AbilityUnlock.skillOrLevel("quicksilver", 15), 20, 240, 0.0D, new AbilityScaling(0, 0.02D, 0, 0, 0)));
         }
 
@@ -103,7 +103,7 @@ public final class StandardAbilities {
 
     private static final class ShadowStepAbility extends BaseAbility {
         private ShadowStepAbility() {
-            super(definition("shadow_step", "Shadow Step", "Teleport behind a targeted living enemy.", "movement",
+            super(spec("shadow_step", "Shadow Step", "Teleport behind a targeted living enemy.", "movement",
                     AbilityUnlock.skill("shadow_exchange"), 55, 200, 18.0D, new AbilityScaling(0, 0.01D, 0, 0.01D, 0.01D)));
         }
 
@@ -120,7 +120,7 @@ public final class StandardAbilities {
 
     private static final class DaggerMasteryAbility extends BaseAbility {
         private DaggerMasteryAbility() {
-            super(definition("dagger_mastery", "Dagger Mastery", "Assume a focused dagger stance that increases close-combat output.", "combat",
+            super(spec("dagger_mastery", "Dagger Mastery", "Assume a focused dagger stance that increases close-combat output.", "combat",
                     AbilityUnlock.skillOrLevel("advanced_dagger_techniques", 10), 18, 300, 0.0D,
                     new AbilityScaling(0.10D, 0.08D, 0, 0, 0.02D)));
         }
@@ -138,7 +138,7 @@ public final class StandardAbilities {
 
     private static final class MutilationAbility extends BaseAbility {
         private MutilationAbility() {
-            super(definition("mutilation", "Mutilation", "Blink into dagger range and deliver a high-damage strike.", "combat",
+            super(spec("mutilation", "Mutilation", "Blink into dagger range and deliver a high-damage strike.", "combat",
                     AbilityUnlock.skillOrLevel("mutilation", 20), 45, 160, 12.0D,
                     new AbilityScaling(0.35D, 0.15D, 0, 0, 0.05D)));
         }
@@ -161,7 +161,7 @@ public final class StandardAbilities {
 
     private static final class BloodlustAbility extends BaseAbility {
         private BloodlustAbility() {
-            super(definition("bloodlust", "Bloodlust", "Overwhelm nearby hostile mobs with fear, weakness, and slowness.", "combat",
+            super(spec("bloodlust", "Bloodlust", "Overwhelm nearby hostile mobs with fear, weakness, and slowness.", "combat",
                     AbilityUnlock.skillOrLevel("bloodlust", 10), 40, 500, 12.0D,
                     new AbilityScaling(0, 0, 0, 0.02D, 0.02D)));
         }
@@ -182,7 +182,7 @@ public final class StandardAbilities {
 
     private static final class AreaSlashAbility extends BaseAbility {
         private AreaSlashAbility() {
-            super(definition("area_slash", "Area Slash", "Sweep daggers through a forward cone and strike multiple targets.", "combat",
+            super(spec("area_slash", "Area Slash", "Sweep daggers through a forward cone and strike multiple targets.", "combat",
                     AbilityUnlock.skillOrLevel("dagger_rush", 25), 65, 360, 6.0D,
                     new AbilityScaling(0.25D, 0.25D, 0, 0, 0.04D)));
         }
@@ -208,7 +208,7 @@ public final class StandardAbilities {
 
     private static final class StealthAbility extends BaseAbility {
         private StealthAbility() {
-            super(definition("stealth", "Stealth", "Become invisible and slightly faster for fifteen seconds.", "utility",
+            super(spec("stealth", "Stealth", "Become invisible and slightly faster for fifteen seconds.", "utility",
                     AbilityUnlock.skillOrLevel("stealth", 5), 25, 400, 0.0D,
                     new AbilityScaling(0, 0.01D, 0, 0.01D, 0.01D)));
         }
@@ -230,7 +230,7 @@ public final class StandardAbilities {
         private final boolean stateOwner;
 
         private AuthorityAbility(String id, AuthorityMode mode, int mana, int cooldown, double range, boolean stateOwner) {
-            super(definition(id, authorityName(mode), "Server-controlled telekinetic " + mode.name().toLowerCase() + ".", "utility",
+            super(spec(id, authorityName(mode), "Server-controlled telekinetic " + mode.name().toLowerCase() + ".", "utility",
                     AbilityUnlock.skillOrLevel("rulers_authority", 30), mana, cooldown, range,
                     new AbilityScaling(0.02D, 0.005D, 0, 0.01D, 0.01D)));
             this.mode = mode;
@@ -336,7 +336,7 @@ public final class StandardAbilities {
 
     private static final class EnhancedSensesAbility extends BaseAbility {
         private EnhancedSensesAbility() {
-            super(definition("enhanced_senses", "Enhanced Senses", "Reveal nearby threats and gain night vision.", "utility",
+            super(spec("enhanced_senses", "Enhanced Senses", "Reveal nearby threats and gain night vision.", "utility",
                     AbilityUnlock.skillOrLevel("", 12), 22, 300, 18.0D,
                     new AbilityScaling(0, 0, 0, 0.02D, 0.08D)));
         }
@@ -353,7 +353,7 @@ public final class StandardAbilities {
 
     private static final class MonarchDomainAbility extends BaseAbility {
         private MonarchDomainAbility() {
-            super(definition("monarch_domain", "Monarch's Domain", "Toggle the mana-draining domain used by the shadow system.", "monarch",
+            super(spec("monarch_domain", "Monarch's Domain", "Toggle the mana-draining domain used by the shadow system.", "monarch",
                     AbilityUnlock.skill("monarch_domain"), 30, 100, 0.0D,
                     new AbilityScaling(0, 0, 0, 0.03D, 0.02D)));
         }
@@ -376,7 +376,7 @@ public final class StandardAbilities {
         private final ShadowHook hook;
 
         private ShadowHookAbility(String id, String name, int mana, int cooldown, ShadowHook hook) {
-            super(definition(id, name, "Validated integration point for the shadow system.", "monarch",
+            super(spec(id, name, "Validated integration point for the shadow system.", "monarch",
                     AbilityUnlock.skill(id.equals("shadow_summoning") ? "shadow_preservation" : id), mana, cooldown, 24.0D, AbilityScaling.NONE));
             this.hook = hook;
         }
@@ -392,7 +392,7 @@ public final class StandardAbilities {
 
     private static final class DragonsFearAbility extends BaseAbility {
         private DragonsFearAbility() {
-            super(definition("dragons_fear", "Dragon's Fear", "Terrify and repel nearby hostile mobs.", "combat",
+            super(spec("dragons_fear", "Dragon's Fear", "Terrify and repel nearby hostile mobs.", "combat",
                     AbilityUnlock.skillOrLevel("dragons_fear", 35), 120, 900, 18.0D,
                     new AbilityScaling(0, 0, 0, 0.03D, 0.03D)));
         }
