@@ -35,29 +35,34 @@ public final class DungeonBoss {
         }
         Ravager boss = EntityType.RAVAGER.create(level);
         if (boss == null) return null;
-        BlockPos position = session.arenaOrigin().offset(0, 1, 10);
+        BlockPos position = DungeonArena.bossCenter(session);
         boss.moveTo(position.getX() + 0.5D, position.getY(), position.getZ() + 0.5D, 180.0F, 0.0F);
         boss.finalizeSpawn(level, level.getCurrentDifficultyAt(position), MobSpawnType.COMMAND, null, null);
+
+        boolean subway = "abandoned_subway".equals(session.templateId());
+        String bossName = subway ? "Subway Warden" : "Iron Sovereign";
         double scale = Math.max(1.0D, rank.rewardMultiplier() * 0.72D);
-        set(boss, Attributes.MAX_HEALTH, 520.0D * scale);
-        set(boss, Attributes.ATTACK_DAMAGE, 18.0D * Math.max(1.0D, scale * 0.65D));
-        set(boss, Attributes.MOVEMENT_SPEED, 0.31D);
-        set(boss, Attributes.ARMOR, 18.0D);
+        double baseHealth = subway ? 240.0D : 520.0D;
+        double baseDamage = subway ? 11.0D : 18.0D;
+        set(boss, Attributes.MAX_HEALTH, baseHealth * scale);
+        set(boss, Attributes.ATTACK_DAMAGE, baseDamage * Math.max(1.0D, scale * 0.65D));
+        set(boss, Attributes.MOVEMENT_SPEED, subway ? 0.28D : 0.31D);
+        set(boss, Attributes.ARMOR, subway ? 10.0D : 18.0D);
         set(boss, Attributes.KNOCKBACK_RESISTANCE, 0.8D);
         boss.setHealth(boss.getMaxHealth());
-        boss.setCustomName(Component.literal("Iron Sovereign"));
+        boss.setCustomName(Component.literal(bossName));
         boss.setCustomNameVisible(true);
         boss.setPersistenceRequired();
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_DUNGEON_ENEMY, true);
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_BOSS, true);
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_SHADOW_EXTRACTABLE, true);
         boss.getPersistentData().putUUID(DungeonTypes.TAG_SESSION, session.sessionId());
-        boss.getPersistentData().putString(DungeonTypes.TAG_ENEMY_ID, "iron_sovereign");
+        boss.getPersistentData().putString(DungeonTypes.TAG_ENEMY_ID, subway ? "subway_warden" : "iron_sovereign");
         if (!level.addFreshEntity(boss)) return null;
         session.enemySpawned(boss.getUUID());
         session.setBossId(boss.getUUID());
-        RUNTIMES.put(session.sessionId(), new BossRuntime(boss));
-        level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, 0.75F);
+        RUNTIMES.put(session.sessionId(), new BossRuntime(boss, bossName));
+        level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, subway ? 0.9F : 0.75F);
         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.4D, boss.getZ(), 80, 1.5D, 1.0D, 1.5D, 0.08D);
         return boss;
     }
@@ -68,7 +73,8 @@ public final class DungeonBoss {
         if (level == null) return TickResult.MISSING;
         Entity entity = level.getEntity(session.bossId());
         if (!(entity instanceof Ravager boss) || !boss.isAlive()) return TickResult.MISSING;
-        BossRuntime runtime = RUNTIMES.computeIfAbsent(session.sessionId(), ignored -> new BossRuntime(boss));
+        String bossName = boss.getCustomName() == null ? "Dungeon Boss" : boss.getCustomName().getString();
+        BossRuntime runtime = RUNTIMES.computeIfAbsent(session.sessionId(), ignored -> new BossRuntime(boss, bossName));
         runtime.tick(server, level, session, boss, rank);
         return TickResult.ALIVE;
     }
@@ -83,12 +89,13 @@ public final class DungeonBoss {
     public static void onDeath(DungeonSession session) { remove(session); }
 
     private static final class BossRuntime {
-        private final ServerBossEvent bar = new ServerBossEvent(Component.literal("Iron Sovereign"), BossEvent.BossBarColor.PURPLE, BossEvent.BossBarOverlay.PROGRESS);
+        private final ServerBossEvent bar;
         private int ticks;
         private boolean phaseTwo;
         private boolean phaseAddsSpawned;
 
-        private BossRuntime(Ravager boss) {
+        private BossRuntime(Ravager boss, String name) {
+            bar = new ServerBossEvent(Component.literal(name), BossEvent.BossBarColor.PURPLE, BossEvent.BossBarOverlay.PROGRESS);
             bar.setDarkenScreen(true);
             bar.setVisible(true);
             bar.setProgress(Math.max(0.0F, boss.getHealth() / boss.getMaxHealth()));
@@ -103,8 +110,8 @@ public final class DungeonBoss {
                 else if (player != null) bar.removePlayer(player);
             }
             if (!phaseTwo && boss.getHealth() <= boss.getMaxHealth() * 0.5F) enterPhaseTwo(level, session, boss, rank);
-            if (!phaseTwo) phaseOne(level, boss);
-            else phaseTwo(level, boss);
+            if (!phaseTwo) phaseOne(level, boss, rank);
+            else phaseTwo(level, boss, rank);
         }
 
         private void enterPhaseTwo(ServerLevel level, DungeonSession session, Ravager boss, DungeonTypes.GateRank rank) {
@@ -116,28 +123,35 @@ public final class DungeonBoss {
             level.sendParticles(ParticleTypes.SOUL, boss.getX(), boss.getY() + 1.0D, boss.getZ(), 100, 2.0D, 1.5D, 2.0D, 0.12D);
             if (!phaseAddsSpawned) {
                 phaseAddsSpawned = true;
-                DungeonEnemies.spawn(level, session, "shadow_raider", session.arenaOrigin().offset(7, 1, 0), rank, false);
-                DungeonEnemies.spawn(level, session, "shadow_raider", session.arenaOrigin().offset(-7, 1, 0), rank, false);
-                DungeonEnemies.spawn(level, session, "shadow_archer", session.arenaOrigin().offset(0, 1, -9), rank, false);
+                BlockPos center = DungeonArena.bossCenter(session);
+                DungeonEnemies.spawn(level, session, "steel_fang_raider", center.offset(7, 0, 0), rank, false);
+                DungeonEnemies.spawn(level, session, "steel_fang_raider", center.offset(-7, 0, 0), rank, false);
+                DungeonEnemies.spawn(level, session, "dungeon_archer", center.offset(0, 0, -7), rank, false);
             }
         }
 
-        private void phaseOne(ServerLevel level, Ravager boss) {
+        private void phaseOne(ServerLevel level, Ravager boss, DungeonTypes.GateRank rank) {
+            float scale = damageScale(rank);
             int cycle = ticks % 100;
             if (cycle == 70) telegraphRing(level, boss, 6.0D, ParticleTypes.WITCH);
-            if (cycle == 80) cleave(level, boss, 6.0D, 12.0F);
+            if (cycle == 80) cleave(level, boss, 6.0D, 8.0F * scale);
             if (ticks % 140 == 115) telegraphRing(level, boss, 9.0D, ParticleTypes.CRIT);
-            if (ticks % 140 == 130) stomp(level, boss, 9.0D, 10.0F, 1.1D);
+            if (ticks % 140 == 130) stomp(level, boss, 9.0D, 7.0F * scale, 1.1D);
         }
 
-        private void phaseTwo(ServerLevel level, Ravager boss) {
+        private void phaseTwo(ServerLevel level, Ravager boss, DungeonTypes.GateRank rank) {
+            float scale = damageScale(rank);
             int blastCycle = ticks % 72;
             if (blastCycle == 52) telegraphLine(level, boss);
-            if (blastCycle == 64) sovereignBlast(level, boss, 16.0F);
+            if (blastCycle == 64) sovereignBlast(level, boss, 11.0F * scale);
             int roarCycle = ticks % 110;
             if (roarCycle == 80) telegraphRing(level, boss, 12.0D, ParticleTypes.SOUL_FIRE_FLAME);
-            if (roarCycle == 95) stomp(level, boss, 12.0D, 15.0F, 1.45D);
+            if (roarCycle == 95) stomp(level, boss, 12.0D, 10.0F * scale, 1.45D);
         }
+    }
+
+    private static float damageScale(DungeonTypes.GateRank rank) {
+        return (float)Math.max(0.75D, Math.min(2.5D, rank.rewardMultiplier() * 0.8D));
     }
 
     private static void cleave(ServerLevel level, Ravager boss, double radius, float damage) {
