@@ -31,20 +31,10 @@ public final class AbilityEffects {
         return dealAbilityDamage(player, target, damage, "unknown");
     }
 
-    /**
-     * Deals server-authoritative ability damage while preserving the player as the kill-credit source.
-     * The depth counter makes nested generated hits safe and prevents normal-hit hooks from recursively
-     * applying critical, equipment, quest, or dagger bonuses.
-     */
+    /** Deals server-authoritative ability damage while preserving player kill credit. */
     public static boolean dealAbilityDamage(ServerPlayer player, LivingEntity target, float damage, String abilityId) {
         if (!AbilityTargeting.isValidTarget(player, target) || damage <= 0.0F) return false;
-        CompoundTag sourceData = player.getPersistentData();
-        int depth = Math.max(0, sourceData.getInt(TAG_DAMAGE_DEPTH));
-        sourceData.putInt(TAG_DAMAGE_DEPTH, depth + 1);
-        sourceData.putBoolean(TAG_GENERATED_DAMAGE, true);
-        sourceData.putBoolean(TAG_ABILITY_DAMAGE, true);
-        sourceData.putString(TAG_ABILITY_ID, AbilityDefinition.normalize(abilityId));
-
+        beginGeneratedDamage(player, abilityId, true, false);
         CompoundTag targetData = target.getPersistentData();
         targetData.putString(TAG_LAST_ABILITY_ID, AbilityDefinition.normalize(abilityId));
         targetData.putUUID(TAG_LAST_ABILITY_OWNER, player.getUUID());
@@ -53,15 +43,46 @@ public final class AbilityEffects {
             target.invulnerableTime = 0;
             return target.hurt(player.damageSources().playerAttack(player), damage);
         } finally {
-            int remaining = Math.max(0, sourceData.getInt(TAG_DAMAGE_DEPTH) - 1);
-            if (remaining == 0) {
-                sourceData.remove(TAG_DAMAGE_DEPTH);
-                sourceData.remove(TAG_GENERATED_DAMAGE);
-                sourceData.remove(TAG_ABILITY_DAMAGE);
-                sourceData.remove(TAG_ABILITY_ID);
-            } else {
-                sourceData.putInt(TAG_DAMAGE_DEPTH, remaining);
-            }
+            endGeneratedDamage(player);
+        }
+    }
+
+    /** Routes equipment bonus hits through the same recursion guard as abilities. */
+    public static boolean dealEquipmentDamage(LivingEntity attacker, LivingEntity target, float damage, String hookId) {
+        if (attacker == null || target == null || attacker == target || !target.isAlive() || damage <= 0.0F) return false;
+        if (attacker instanceof ServerPlayer player && !AbilityTargeting.isValidTarget(player, target)) return false;
+        beginGeneratedDamage(attacker, "equipment_" + AbilityDefinition.normalize(hookId), false, true);
+        try {
+            target.invulnerableTime = 0;
+            return attacker instanceof ServerPlayer player
+                    ? target.hurt(player.damageSources().playerAttack(player), damage)
+                    : target.hurt(attacker.damageSources().mobAttack(attacker), damage);
+        } finally {
+            endGeneratedDamage(attacker);
+        }
+    }
+
+    private static void beginGeneratedDamage(LivingEntity source, String id, boolean ability, boolean equipment) {
+        CompoundTag data = source.getPersistentData();
+        int depth = Math.max(0, data.getInt(TAG_DAMAGE_DEPTH));
+        data.putInt(TAG_DAMAGE_DEPTH, depth + 1);
+        data.putBoolean(TAG_GENERATED_DAMAGE, true);
+        if (ability) data.putBoolean(TAG_ABILITY_DAMAGE, true);
+        if (equipment) data.putBoolean("sl_weapon_bonus", true);
+        data.putString(TAG_ABILITY_ID, AbilityDefinition.normalize(id));
+    }
+
+    private static void endGeneratedDamage(LivingEntity source) {
+        CompoundTag data = source.getPersistentData();
+        int remaining = Math.max(0, data.getInt(TAG_DAMAGE_DEPTH) - 1);
+        if (remaining == 0) {
+            data.remove(TAG_DAMAGE_DEPTH);
+            data.remove(TAG_GENERATED_DAMAGE);
+            data.remove(TAG_ABILITY_DAMAGE);
+            data.remove("sl_weapon_bonus");
+            data.remove(TAG_ABILITY_ID);
+        } else {
+            data.putInt(TAG_DAMAGE_DEPTH, remaining);
         }
     }
 
@@ -144,7 +165,7 @@ public final class AbilityEffects {
         Vec3 delta = destination.subtract(player.position());
         AABB moved = player.getBoundingBox().move(delta);
         if (!level.noCollision(player, moved)) return false;
-        BlockPos support = BlockPos.containing(destination.x, destination.y - 0.1D, destination.z).below();
+        BlockPos support = BlockPos.containing(destination.x, destination.y - 0.1D, destination.z);
         return !level.getBlockState(support).getCollisionShape(level, support).isEmpty();
     }
 
