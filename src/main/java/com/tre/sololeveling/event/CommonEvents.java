@@ -1,33 +1,32 @@
 package com.tre.sololeveling.event;
 
 import com.tre.sololeveling.command.SoloLevelingCommands;
+import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.data.HunterData;
-import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.AbilityHandler;
 import com.tre.sololeveling.gameplay.PassiveHandler;
 import com.tre.sololeveling.gameplay.ProgressionHandler;
-import com.tre.sololeveling.config.ModConfigs;
+import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ShadowHandler;
 import com.tre.sololeveling.quest.QuestApi;
 import com.tre.sololeveling.quest.QuestManager;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
-import net.minecraftforge.event.TickEvent;
 
 public final class CommonEvents {
     @SubscribeEvent
@@ -99,8 +98,6 @@ public final class CommonEvents {
         }
     }
 
-
-
     @SubscribeEvent
     public void itemPickup(EntityItemPickupEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) QuestApi.onCollected(player, event.getItem().getItem());
@@ -137,6 +134,7 @@ public final class CommonEvents {
             PassiveHandler.breakStealth(attacker);
             boolean generatedDamage = attacker.getPersistentData().getBoolean("sl_ability_damage")
                     || attacker.getPersistentData().getBoolean("sl_weapon_bonus");
+            if (!generatedDamage) QuestHandler.onAttack(attacker);
             if (!generatedDamage && attacker.getRandom().nextDouble() < HunterData.getCriticalChance(attacker)) {
                 double multiplier = HunterData.getCriticalDamageMultiplier(attacker);
                 event.setAmount((float)(event.getAmount() * multiplier));
