@@ -10,6 +10,7 @@ import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ShadowHandler;
 import com.tre.sololeveling.registry.ModItems;
+import com.tre.sololeveling.quest.QuestCommands;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -168,9 +169,7 @@ public final class SoloLevelingCommands {
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> questCommands() {
-        return Commands.literal("quest").requires(source -> source.hasPermission(2))
-                .then(Commands.literal("mainstage").then(valueTargetNode(0, 5, HunterData::setProgressionStage, "Main quest stage changed")))
-                .then(Commands.literal("reset").then(playerTarget(HunterData::resetProgression, "Quest progression reset")));
+        return QuestCommands.node();
     }
 
     private static LiteralArgumentBuilder<CommandSourceStack> penaltyCommands() {
