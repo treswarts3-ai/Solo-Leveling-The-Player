@@ -39,10 +39,7 @@ public final class ServerActionHandler {
         if (action.equals("DISMISS_SHADOWS")) { ShadowHandler.dismissAll(player); return; }
         if (action.equals("SHADOW_MODE")) { ShadowHandler.cycleMode(player); return; }
         if (action.equals("SHADOW_EXCHANGE")) { ShadowHandler.exchange(player); return; }
-        if (action.equals("TOGGLE_DOMAIN")) {
-            if (HunterData.hasSkill(player, "monarch_domain")) HunterData.toggleDomain(player);
-            return;
-        }
+        if (action.equals("TOGGLE_DOMAIN")) { AbilityHandler.activate(player, "monarch_domain"); return; }
         if (action.equals("STORE_HELD")) { HunterData.storeHeld(player); return; }
         if (action.equals("RETRIEVE_FIRST")) { HunterData.retrieveFirst(player); return; }
         if (action.startsWith("RETRIEVE_SLOT:")) {
