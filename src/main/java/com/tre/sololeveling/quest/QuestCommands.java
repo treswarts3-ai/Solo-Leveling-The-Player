@@ -36,7 +36,7 @@ public final class QuestCommands {
                                 .then(Commands.argument("quest", StringArgumentType.word()).suggests(QuestCommands::suggestQuests)
                                         .then(Commands.argument("objective", StringArgumentType.word())
                                                 .then(Commands.argument("amount", IntegerArgumentType.integer(1, 1_000_000))
-                                                        .executes(ctx -> respond(ctx.getSource(), QuestManager.advanceObjective(
+                                                        .executes(ctx -> respond(ctx.getSource(), advanceObjective(
                                                                 EntityArgument.getPlayer(ctx, "player"),
                                                                 QuestRegistry.parse(StringArgumentType.getString(ctx, "quest")),
                                                                 StringArgumentType.getString(ctx, "objective"),
@@ -78,6 +78,18 @@ public final class QuestCommands {
         }
         if (count == 0) source.sendSuccess(() -> Component.literal("No active quests"), false);
         return count;
+    }
+
+    private static QuestTypes.Result advanceObjective(ServerPlayer player, ResourceLocation questId, String objectiveId, int amount) {
+        QuestTypes.Definition definition = QuestRegistry.find(questId).orElse(null);
+        if (definition == null) return QuestTypes.Result.fail("Unknown quest: " + questId);
+        if (QuestStore.status(player, definition) != QuestTypes.Status.ACTIVE) return QuestTypes.Result.fail("Quest is not active");
+        for (QuestTypes.Objective objective : definition.objectives()) {
+            if (!objective.id().equals(objectiveId)) continue;
+            boolean changed = QuestManager.advance(player, objective.type(), objective.target(), amount);
+            return changed ? QuestTypes.Result.ok("Advanced " + objectiveId) : QuestTypes.Result.fail("Objective could not advance");
+        }
+        return QuestTypes.Result.fail("Unknown objective: " + objectiveId);
     }
 
     private static int respond(CommandSourceStack source, QuestTypes.Result result) {
