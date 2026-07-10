@@ -1,6 +1,7 @@
 package com.tre.sololeveling.gameplay;
 
 import com.tre.sololeveling.data.HunterData;
+import com.tre.sololeveling.gameplay.ability.AbilityService;
 import com.tre.sololeveling.quest.QuestApi;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -10,6 +11,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.registries.ForgeRegistries;
 
+import java.util.Locale;
 import java.util.Map;
 
 public final class ServerActionHandler {
@@ -32,29 +34,17 @@ public final class ServerActionHandler {
         if (action.startsWith("ALLOCATE:")) { HunterData.allocate(player, action.substring(9), 1); return; }
         if (action.startsWith("ALLOCATE5:")) { HunterData.allocate(player, action.substring(10), 5); return; }
         if (action.startsWith("GROWTH_CHOICE:")) { ProgressionChoiceHandler.choose(player, action.substring(14)); return; }
+        if (action.startsWith("MILESTONE_CHOICE:")) { ProgressionChoiceHandler.chooseMilestone(player, action.substring(17)); return; }
+        if (action.equals("BEGIN_RANK_TRIAL")) { ProgressionChoiceHandler.beginRankTrial(player); return; }
         if (action.startsWith("ABILITY:")) {
-            String skill = action.substring(8).toLowerCase(java.util.Locale.ROOT);
-            int manaBefore = HunterData.getMana(player);
-            long cooldownBefore = HunterData.cooldownRemaining(player, skill);
-            AbilityHandler.activate(player, skill);
-            if (cooldownBefore == 0L && HunterData.cooldownRemaining(player, skill) > 0L) {
-                QuestApi.onAbilityUsed(player, skill);
-                QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
-                QuestHandler.onAbilityUse(player);
-            }
+            String skill = action.substring(8).toLowerCase(Locale.ROOT);
+            activateAndTrack(player, skill, skill);
             return;
         }
         if (action.startsWith("AUTHORITY:")) {
-            String mode = action.substring(10).toLowerCase(java.util.Locale.ROOT);
-            String cooldownKey = "rulers_authority_" + mode;
-            int manaBefore = HunterData.getMana(player);
-            long cooldownBefore = HunterData.cooldownRemaining(player, cooldownKey);
-            AbilityHandler.activateAuthority(player, mode);
-            if (cooldownBefore == 0L && HunterData.cooldownRemaining(player, cooldownKey) > 0L) {
-                QuestApi.onAbilityUsed(player, "rulers_authority");
-                QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
-                QuestHandler.onAbilityUse(player);
-            }
+            String mode = action.substring(10).toLowerCase(Locale.ROOT).trim();
+            String abilityId = mode.isBlank() ? "rulers_authority" : "rulers_authority_" + mode;
+            activateAndTrack(player, abilityId, "rulers_authority");
             return;
         }
         if (action.startsWith("EXERCISE:")) { QuestHandler.exercise(player, action.substring(9)); return; }
@@ -64,7 +54,7 @@ public final class ServerActionHandler {
         if (action.equals("DISMISS_SHADOWS")) { ShadowHandler.dismissAll(player); return; }
         if (action.equals("SHADOW_MODE")) { ShadowHandler.cycleMode(player); return; }
         if (action.equals("SHADOW_EXCHANGE")) { ShadowHandler.exchange(player); return; }
-        if (action.equals("TOGGLE_DOMAIN")) { AbilityHandler.activate(player, "monarch_domain"); return; }
+        if (action.equals("TOGGLE_DOMAIN")) { activateAndTrack(player, "monarch_domain", "monarch_domain"); return; }
         if (action.equals("STORE_HELD")) { HunterData.storeHeld(player); return; }
         if (action.equals("RETRIEVE_FIRST")) { HunterData.retrieveFirst(player); return; }
         if (action.startsWith("RETRIEVE_SLOT:")) {
@@ -73,6 +63,14 @@ public final class ServerActionHandler {
             return;
         }
         if (action.startsWith("BUY:")) { buy(player, action.substring(4)); }
+    }
+
+    private static void activateAndTrack(ServerPlayer player, String abilityId, String questId) {
+        int manaBefore = HunterData.getMana(player);
+        if (!AbilityService.activate(player, abilityId)) return;
+        QuestApi.onAbilityUsed(player, questId);
+        QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
+        QuestHandler.onAbilityUse(player);
     }
 
     private static boolean allowAction(ServerPlayer player) {
