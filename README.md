@@ -1,28 +1,32 @@
 # Solo Leveling: The Player
 
-A Minecraft Forge 1.20.1 character-progression mod centered on the player: hunter XP, levels, stats, mana, equipment, quests, active skills, System interfaces, and a persistent shadow army.
+A Minecraft Forge 1.20.1 character-progression mod centered on the player: hunter XP, levels, stats, mana, equipment, quests, active skills, System interfaces, gates, dungeons, bosses, and a persistent shadow army.
 
 ## Requirements
 
 - Minecraft Java Edition 1.20.1
-- Forge 47.x
+- Forge 47.4.10 or newer in the Forge 47.x line
 - Java 17
 - No required third-party mod dependency
 
-## Build
+## Download
+
+Download the latest JAR from this repository's **Releases** page. The first public build is published as a prerelease because full in-game and multiplayer acceptance testing is still in progress.
+
+## Install
+
+1. Install Forge for Minecraft 1.20.1.
+2. Copy `sololeveling-1.0.0.jar` into the instance `mods` folder.
+3. Start Minecraft and create or open a world.
+4. An operator can use `/sl awaken <player>`, or the player can open the System with **M** and select **Awaken System**.
+
+## Build from source
 
 ```bash
 ./gradlew clean build
 ```
 
 The compiled mod is produced in `build/libs/`.
-
-## Install
-
-1. Install Forge for Minecraft 1.20.1.
-2. Copy the generated `sololeveling-*.jar` into the instance `mods` folder.
-3. Start Minecraft and create or open a world.
-4. An operator can use `/sl awaken <player>`, or the player can open the System with **M** and select **Awaken System**.
 
 ## Current systems
 
@@ -32,6 +36,7 @@ The compiled mod is produced in `build/libs/`.
 - Daily exercises, penalty flow, tutorial, Job Change, Shadow Mastery, Black Heart, and emergency progression
 - Stealth, Bloodlust, Quicksilver, Mutilation, Dagger Rush, Ruler's Authority, and Dragon's Fear
 - Shadow extraction, storage, summon, dismissal, AI modes, Shadow Exchange, and Monarch's Domain
+- Persistent gates and dungeon sessions with objectives, timers, recovery, rewards, enemies, elites, and boss encounters
 - Signature weapons, armor, accessories, equipment sets, runes, keys, potions, materials, and story items
 - Original generated PNG textures, editable HTML pixel-art sources, particles, and OGG sounds
 
@@ -52,11 +57,11 @@ The compiled mod is produced in `build/libs/`.
 
 ## Development workflow
 
-This repository is structured for parallel development through isolated feature branches and draft pull requests.
+This repository is structured for parallel development through isolated feature branches and pull requests. The integrated release candidate is maintained on `main`.
 
 - Architecture and coding rules: [`DEVELOPMENT.md`](DEVELOPMENT.md)
 - Workstream ownership: [`FILE_OWNERSHIP.md`](FILE_OWNERSHIP.md)
-- PDF acceptance tracking: [`COMPLETION_MATRIX.md`](COMPLETION_MATRIX.md)
+- Acceptance tracking: [`COMPLETION_MATRIX.md`](COMPLETION_MATRIX.md)
 - Merge state and current checkpoint: [`INTEGRATION_STATUS.md`](INTEGRATION_STATUS.md)
 - Contribution workflow: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Commands and player documentation: [`docs/`](docs/)
@@ -69,7 +74,8 @@ This repository is structured for parallel development through isolated feature 
 - [Asset manifest](docs/ASSET_MANIFEST.md)
 - [Research notes](docs/RESEARCH.md)
 - [Testing report](docs/TESTING_REPORT.md)
+- [Changelog](CHANGELOG.md)
 
-## Scope
+## Release status
 
-Bosses are deliberately outside the current project scope. Development is focused on making the player, System, quests, equipment, abilities, and Shadow Monarch progression complete and stable first.
+Version 1.0.0 is a compiled development prerelease. Automated Forge builds pass, but gameplay balance, long-session persistence, dedicated-server runtime behavior, multiplayer stress, and visual polish still require hands-on testing.
