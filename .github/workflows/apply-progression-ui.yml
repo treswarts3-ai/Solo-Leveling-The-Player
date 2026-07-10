@@ -28,58 +28,32 @@ jobs:
           path = Path('src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java')
           text = path.read_text(encoding='utf-8')
 
-          old_buttons = '''    private void addQuestButtons() {
-              int y = contentY + contentHeight - 20;
-              int claimWidth = Math.min(72, Math.max(56, contentWidth / 4));
-              int remaining = contentWidth - claimWidth - 6;
-              int exerciseWidth = Math.max(42, remaining / 3);
-              String[] names = {"Push-up", "Sit-up", "Squat"};
-              String[] ids = {"pushup", "situp", "squat"};
-              for (int i = 0; i < 3; i++) {
-                  int index = i;
-                  Button button = Button.builder(Component.literal(names[i]), ignored -> send("EXERCISE:" + ids[index]))
-                          .bounds(contentX + i * exerciseWidth, y, exerciseWidth - 2, 18).build();
-                  addRenderableWidget(button);
-              }
-              Button claim = Button.builder(Component.literal("CLAIM"), ignored -> send("CLAIM_DAILY"))
-                      .bounds(contentX + contentWidth - claimWidth, y, claimWidth, 18).build();
-              actionButtons.put("claim_daily", claim);
-              addRenderableWidget(claim);
-          }
-          '''
-          new_buttons = '''    private void addQuestButtons() {
+          start = text.index('    private void addQuestButtons() {')
+          end = text.index('    private void addStoreButtons()', start)
+          replacement = '''    private void addQuestButtons() {
               int y = contentY + contentHeight - 20;
               Button claim = Button.builder(Component.literal("CLAIM DAILY REWARD"), ignored -> send("CLAIM_DAILY"))
                       .bounds(contentX, y, Math.min(150, contentWidth), 18).build();
               actionButtons.put("claim_daily", claim);
               addRenderableWidget(claim);
           }
-          '''
 
-          old_objectives = '''        graphics.drawString(font, "DAILY — PREPARATION TO BECOME POWERFUL", contentX, y, SystemUi.Theme.CYAN, false);
-              y += 14;
-              objective(graphics, y, "Hostile mobs", data.raw().getInt("daily_kills"), 10); y += 14;
-              objective(graphics, y, "Run blocks", data.raw().getInt("daily_run"), 1000); y += 14;
-              objective(graphics, y, "Push-ups", data.raw().getInt("daily_pushups"), 30); y += 14;
-              objective(graphics, y, "Sit-ups", data.raw().getInt("daily_situps"), 30); y += 14;
-              objective(graphics, y, "Squats", data.raw().getInt("daily_squats"), 30); y += 16;
           '''
-          new_objectives = '''        graphics.drawString(font, "DAILY — ADAPTIVE HUNTER TRAINING", contentX, y, SystemUi.Theme.CYAN, false);
-              y += 14;
-              objective(graphics, y, "Defeat enemies", data.raw().getInt("daily_kills"), 8); y += 14;
-              objective(graphics, y, "Sprint distance", data.raw().getInt("daily_run"), 600); y += 14;
-              objective(graphics, y, "Land attacks", data.raw().getInt("daily_attacks"), 20); y += 14;
-              objective(graphics, y, "Jump and traverse", data.raw().getInt("daily_jumps"), 15); y += 14;
-              objective(graphics, y, "Use abilities", data.raw().getInt("daily_abilities"), 5); y += 16;
-          '''
+          text = text[:start] + replacement + text[end:]
 
-          if old_buttons not in text:
-              raise SystemExit('Expected exercise button block was not found')
-          if old_objectives not in text:
-              raise SystemExit('Expected daily objective block was not found')
+          replacements = {
+              'DAILY — PREPARATION TO BECOME POWERFUL': 'DAILY — ADAPTIVE HUNTER TRAINING',
+              'objective(graphics, y, "Hostile mobs", data.raw().getInt("daily_kills"), 10);': 'objective(graphics, y, "Defeat enemies", data.raw().getInt("daily_kills"), 8);',
+              'objective(graphics, y, "Run blocks", data.raw().getInt("daily_run"), 1000);': 'objective(graphics, y, "Sprint distance", data.raw().getInt("daily_run"), 600);',
+              'objective(graphics, y, "Push-ups", data.raw().getInt("daily_pushups"), 30);': 'objective(graphics, y, "Land attacks", data.raw().getInt("daily_attacks"), 20);',
+              'objective(graphics, y, "Sit-ups", data.raw().getInt("daily_situps"), 30);': 'objective(graphics, y, "Jump and traverse", data.raw().getInt("daily_jumps"), 15);',
+              'objective(graphics, y, "Squats", data.raw().getInt("daily_squats"), 30);': 'objective(graphics, y, "Use abilities", data.raw().getInt("daily_abilities"), 5);',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f'Expected UI text not found: {old}')
+              text = text.replace(old, new, 1)
 
-          text = text.replace(old_buttons, new_buttons, 1)
-          text = text.replace(old_objectives, new_objectives, 1)
           path.write_text(text, encoding='utf-8')
           PY
 
