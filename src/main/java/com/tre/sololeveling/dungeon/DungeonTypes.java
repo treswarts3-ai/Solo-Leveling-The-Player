@@ -5,6 +5,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.Level;
 
 import java.util.LinkedHashMap;
@@ -24,13 +25,15 @@ public final class DungeonTypes {
     public static final int MAX_LIVE_ENEMIES = 64;
     public static final int MAX_WAVE_SPAWNS = 160;
 
-    public enum GateRank {
+    public enum GateRank implements StringRepresentable {
         E(1, 1.0D), D(10, 1.2D), C(20, 1.5D), B(30, 2.0D), A(40, 2.8D), S(60, 4.0D);
         private final int minimumLevel;
         private final double rewardMultiplier;
         GateRank(int minimumLevel, double rewardMultiplier) { this.minimumLevel = minimumLevel; this.rewardMultiplier = rewardMultiplier; }
         public int minimumLevel() { return minimumLevel; }
         public double rewardMultiplier() { return rewardMultiplier; }
+        @Override
+        public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
         public static GateRank parse(String value) {
             String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT).replace("-RANK", "").replace("_RANK", "");
             try { return GateRank.valueOf(normalized); } catch (IllegalArgumentException ignored) { return E; }
