@@ -68,3 +68,12 @@ jobs:
             build.log
             build/libs/*.jar
             build/reports/**
+            src/**
+            docs/**
+            tools/**
+            README.md
+            build.gradle
+            gradle.properties
+            settings.gradle
+            gradlew
+            gradle/wrapper/**
