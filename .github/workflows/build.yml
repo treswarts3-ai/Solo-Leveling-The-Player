@@ -35,7 +35,8 @@ jobs:
           git config user.name "solo-leveling-ui-worker"
           git config user.email "ui-worker@users.noreply.github.com"
           python tools/apply_ui_overhaul.py
-          git rm -r tools/ui_patch tools/apply_ui_overhaul.py .github/workflows/apply-ui-overhaul.yml
+          git checkout HEAD -- .github/workflows/build.yml .github/workflows/apply-ui-overhaul.yml
+          git rm -r tools/ui_patch tools/apply_ui_overhaul.py
           git add -A
           git diff --cached --check
           git commit -m "Overhaul System UI and HUD"
@@ -52,7 +53,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
+        uses: actions/wrapper-validation@v4
 
       - name: Validate authored dungeon structures
         shell: bash
