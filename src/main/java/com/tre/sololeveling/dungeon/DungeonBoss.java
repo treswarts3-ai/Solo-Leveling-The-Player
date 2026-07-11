@@ -42,17 +42,13 @@ public final class DungeonBoss {
         boss.moveTo(position.getX() + 0.5D, position.getY(), position.getZ() + 0.5D, 180.0F, 0.0F);
         boss.finalizeSpawn(level, level.getCurrentDifficultyAt(position), MobSpawnType.COMMAND, null, null);
 
-        boolean subway = "abandoned_subway".equals(session.templateId());
-        boolean temple = "cartenon_temple".equals(session.templateId());
-        String bossName = subway ? "Subway Warden" : temple ? "Architect's Idol" : "Iron Sovereign";
+        String bossName = "Abyssal Monarch";
         double scale = Math.max(1.0D, rank.rewardMultiplier() * 0.72D);
-        double baseHealth = subway ? 180.0D : temple ? 680.0D : 520.0D;
-        double baseDamage = subway ? 8.5D : temple ? 21.0D : 18.0D;
-        set(boss, Attributes.MAX_HEALTH, baseHealth * scale);
-        set(boss, Attributes.ATTACK_DAMAGE, baseDamage * Math.max(1.0D, scale * 0.65D));
-        set(boss, Attributes.MOVEMENT_SPEED, subway ? 0.27D : temple ? 0.29D : 0.31D);
-        set(boss, Attributes.ARMOR, subway ? 6.0D : temple ? 22.0D : 18.0D);
-        set(boss, Attributes.KNOCKBACK_RESISTANCE, subway ? 0.65D : 0.8D);
+        set(boss, Attributes.MAX_HEALTH, 620.0D * scale);
+        set(boss, Attributes.ATTACK_DAMAGE, 19.0D * Math.max(1.0D, scale * 0.65D));
+        set(boss, Attributes.MOVEMENT_SPEED, 0.30D);
+        set(boss, Attributes.ARMOR, 20.0D);
+        set(boss, Attributes.KNOCKBACK_RESISTANCE, 0.82D);
         boss.setHealth(boss.getMaxHealth());
         boss.setCustomName(Component.literal(bossName));
         boss.setCustomNameVisible(true);
@@ -61,15 +57,14 @@ public final class DungeonBoss {
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_BOSS, true);
         boss.getPersistentData().putBoolean(DungeonTypes.TAG_SHADOW_EXTRACTABLE, true);
         boss.getPersistentData().putUUID(DungeonTypes.TAG_SESSION, session.sessionId());
-        boss.getPersistentData().putString(DungeonTypes.TAG_ENEMY_ID,
-                subway ? "subway_warden" : temple ? "architect_idol" : "iron_sovereign");
+        boss.getPersistentData().putString(DungeonTypes.TAG_ENEMY_ID, "abyssal_monarch");
         boss.getPersistentData().putBoolean(TAG_PHASE_TWO, false);
         boss.getPersistentData().putBoolean(TAG_PHASE_ADDS, false);
         if (!level.addFreshEntity(boss)) return null;
         session.enemySpawned(boss.getUUID());
         session.setBossId(boss.getUUID());
         RUNTIMES.put(session.sessionId(), new BossRuntime(boss, bossName));
-        level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, subway ? 0.9F : 0.75F);
+        level.playSound(null, boss.blockPosition(), SoundEvents.RAVAGER_ROAR, SoundSource.HOSTILE, 2.0F, 0.72F);
         level.sendParticles(ParticleTypes.SOUL_FIRE_FLAME, boss.getX(), boss.getY() + 1.4D, boss.getZ(), 80, 1.5D, 1.0D, 1.5D, 0.08D);
         return boss;
     }
@@ -147,8 +142,7 @@ public final class DungeonBoss {
                 phaseAddsSpawned = true;
                 boss.getPersistentData().putBoolean(TAG_PHASE_ADDS, true);
                 BlockPos center = DungeonArena.bossCenter(session);
-                String reinforcement = "cartenon_temple".equals(session.templateId())
-                        ? "stone_guardian" : "steel_fang_raider";
+                String reinforcement = "shadow_guardian";
                 DungeonEnemies.spawn(level, session, reinforcement, center.offset(7, 0, 0), rank, false);
                 DungeonEnemies.spawn(level, session, reinforcement, center.offset(-7, 0, 0), rank, false);
             }

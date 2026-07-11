@@ -43,7 +43,7 @@ This document records the behavior on `main` at commit `c15d4e916198ccf81bfa08f0
 ## Dungeon enemies and bosses
 
 - Enemy roles select different vanilla entity bases and attributes, but role-specific active combat logic is minimal.
-- The Subway Warden and Iron Sovereign have telegraphed ring, cleave, stomp, and directional blast attacks.
+- The active Abyssal Monarch has telegraphed ring, cleave, stomp, and directional blast attacks.
 - Boss damage queries are bounded, but line-of-sight checks are not applied before area or cone damage.
 
 ## Presentation

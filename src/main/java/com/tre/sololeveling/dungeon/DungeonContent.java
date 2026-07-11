@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/** Registry of combat content for the single active master dungeon. */
 public final class DungeonContent {
     private static final Map<String, DungeonTypes.EnemyDefinition> ENEMIES = new LinkedHashMap<>();
     private static final Map<String, DungeonTypes.DungeonTemplate> TEMPLATES = new LinkedHashMap<>();
@@ -23,68 +24,48 @@ public final class DungeonContent {
         enemy(new DungeonTypes.EnemyDefinition("shadow_archer", DungeonTypes.EnemyKind.RANGED, 42, 8, 0.28, 4, false, true));
         enemy(new DungeonTypes.EnemyDefinition("shadow_commander", DungeonTypes.EnemyKind.ELITE, 190, 16, 0.31, 14, true, true));
 
-        Map<String, DungeonTypes.WaveDefinition> lowWaves = waves(
-                wave("low_wave_1", false, spawn("goblin_soldier", 3), spawn("steel_fang_raider", 2)),
-                wave("low_collection_wave", true, spawn("goblin_soldier", 3), spawn("dungeon_archer", 2)),
-                wave("low_elite", false, spawn("orc_commander", 1), spawn("goblin_soldier", 1))
+        Map<String, DungeonTypes.WaveDefinition> waves = waves(
+                wave("bridge_vanguard", false,
+                        spawn("goblin_soldier", 4), spawn("steel_fang_raider", 4)),
+                wave("ossuary_harvest", true,
+                        spawn("shadow_goblin", 4), spawn("dungeon_archer", 4)),
+                wave("plaza_siege", false,
+                        spawn("shadow_goblin", 5), spawn("shadow_raider", 4), spawn("shadow_archer", 3)),
+                wave("foundry_overseers", false,
+                        spawn("orc_commander", 2), spawn("stone_guardian", 2), spawn("dungeon_archer", 2)),
+                wave("basilica_relics", true,
+                        spawn("shadow_guardian", 3), spawn("shadow_archer", 3), spawn("shadow_raider", 2)),
+                wave("prison_wardens", false,
+                        spawn("shadow_commander", 2), spawn("shadow_guardian", 2), spawn("shadow_goblin", 2)),
+                wave("sunken_legion", false,
+                        spawn("shadow_goblin", 5), spawn("shadow_raider", 4),
+                        spawn("shadow_archer", 3), spawn("shadow_guardian", 2))
         );
-        template(new DungeonTypes.DungeonTemplate(
-                "abandoned_subway", "Abandoned Subway", DungeonTypes.GateRank.E, 20 * 60 * 14,
-                List.of(
-                        objective(DungeonTypes.ObjectiveType.WAVE, "clear_platform", "low_wave_1", 5, 20 * 60 * 4, "Clear the abandoned platform"),
-                        objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_mana_crystals", "low_collection_wave", 3, 20 * 60 * 4, "Recover three mana crystals"),
-                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_station_guard", "low_elite", 2, 20 * 60 * 3, "Defeat the station guard and escort"),
-                        objective(DungeonTypes.ObjectiveType.BOSS, "defeat_subway_warden", "subway_warden", 1, 20 * 60 * 5, "Defeat the Subway Warden"),
-                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_low_reward", "reward_room", 1, 20 * 60, "Enter the sealed reward vault")
-                ), lowWaves, reward(750, 280, item("minecraft:emerald", 4), item("minecraft:amethyst_shard", 8), item("minecraft:gold_ingot", 3))
-        ));
 
-        Map<String, DungeonTypes.WaveDefinition> midWaves = waves(
-                wave("mid_wave_1", false, spawn("shadow_goblin", 6), spawn("shadow_raider", 4), spawn("shadow_archer", 3)),
-                wave("mid_collection_wave", true, spawn("shadow_raider", 5), spawn("shadow_guardian", 2), spawn("shadow_archer", 3)),
-                wave("mid_elite", false, spawn("shadow_commander", 1), spawn("shadow_goblin", 3))
-        );
         template(new DungeonTypes.DungeonTemplate(
-                "red_orc_outpost", "Red Orc Stronghold", DungeonTypes.GateRank.B, 20 * 60 * 16,
+                MasterDungeonBuilder.ID, MasterDungeonBuilder.DISPLAY_NAME, DungeonTypes.GateRank.A, 20 * 60 * 38,
                 List.of(
-                        objective(DungeonTypes.ObjectiveType.WAVE, "break_outer_guard", "mid_wave_1", 13, 20 * 60 * 5, "Break the outer guard"),
-                        objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_essence_stones", "mid_collection_wave", 8, 20 * 60 * 5, "Recover eight essence stones"),
-                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_orc_commander", "mid_elite", 4, 20 * 60 * 4, "Defeat the orc commander and escort"),
-                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_mid_reward", "reward_room", 1, 20 * 60, "Enter the reward room")
-                ), midWaves, reward(2200, 900, item("minecraft:diamond", 2), item("minecraft:emerald", 12))
-        ));
-
-        Map<String, DungeonTypes.WaveDefinition> highWaves = waves(
-                wave("high_wave_1", false, spawn("shadow_goblin", 6), spawn("shadow_raider", 5), spawn("shadow_guardian", 3), spawn("shadow_archer", 4)),
-                wave("high_collection_wave", true, spawn("shadow_raider", 6), spawn("shadow_guardian", 3), spawn("shadow_archer", 4)),
-                wave("high_elite", false, spawn("shadow_commander", 2), spawn("shadow_guardian", 2))
-        );
-        template(new DungeonTypes.DungeonTemplate(
-                "demon_castle_foyer", "Demon Castle Foyer", DungeonTypes.GateRank.A, 20 * 60 * 22,
-                List.of(
-                        objective(DungeonTypes.ObjectiveType.WAVE, "survive_castle_vanguard", "high_wave_1", 18, 20 * 60 * 6, "Survive the castle vanguard"),
-                        objective(DungeonTypes.ObjectiveType.COLLECTION, "seal_demonic_cores", "high_collection_wave", 10, 20 * 60 * 5, "Seal ten demonic cores"),
-                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_twin_commanders", "high_elite", 4, 20 * 60 * 5, "Defeat the twin commanders"),
-                        objective(DungeonTypes.ObjectiveType.BOSS, "defeat_iron_sovereign", "iron_sovereign", 1, 20 * 60 * 6, "Defeat the Iron Sovereign"),
-                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_high_reward", "reward_room", 1, 20 * 60, "Enter the sovereign vault")
-                ), highWaves, reward(6000, 2600, item("minecraft:netherite_scrap", 2), item("minecraft:diamond", 5), item("minecraft:echo_shard", 3))
-        ));
-
-        Map<String, DungeonTypes.WaveDefinition> templeWaves = waves(
-                wave("temple_gallery", false, spawn("stone_guardian", 3), spawn("shadow_archer", 5)),
-                wave("temple_trials", true, spawn("shadow_guardian", 3), spawn("shadow_archer", 4), spawn("shadow_raider", 3)),
-                wave("temple_judges", false, spawn("shadow_commander", 2), spawn("stone_guardian", 2))
-        );
-        template(new DungeonTypes.DungeonTemplate(
-                "cartenon_temple", "Cartenon Temple", DungeonTypes.GateRank.S, 20 * 60 * 24,
-                List.of(
-                        objective(DungeonTypes.ObjectiveType.WAVE, "survive_statue_gallery", "temple_gallery", 8, 20 * 60 * 6, "Survive the statue gallery"),
-                        objective(DungeonTypes.ObjectiveType.COLLECTION, "complete_temple_trials", "temple_trials", 8, 20 * 60 * 5, "Recover eight runes of obedience"),
-                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_temple_judges", "temple_judges", 4, 20 * 60 * 5, "Defeat the temple judges"),
-                        objective(DungeonTypes.ObjectiveType.BOSS, "defeat_architect_idol", "architect_idol", 1, 20 * 60 * 7, "Defeat the Architect's Idol"),
-                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_temple_relic", "reward_room", 1, 20 * 60, "Enter the hidden reliquary")
-                ), templeWaves, reward(10000, 5000, item("minecraft:netherite_scrap", 4),
-                        item("minecraft:diamond", 8), item("minecraft:echo_shard", 6), item("minecraft:totem_of_undying", 1))
+                        objective(DungeonTypes.ObjectiveType.WAVE, "break_bridge_vanguard", "bridge_vanguard", 8,
+                                20 * 60 * 5, "Break the vanguard at the Broken Bridge"),
+                        objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_ossuary_sigils", "ossuary_harvest", 6,
+                                20 * 60 * 5, "Recover six death sigils in the Ossuary Ward"),
+                        objective(DungeonTypes.ObjectiveType.WAVE, "survive_buried_plaza", "plaza_siege", 12,
+                                20 * 60 * 6, "Survive the siege of the Buried Kingdom"),
+                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_foundry_overseers", "foundry_overseers", 6,
+                                20 * 60 * 6, "Defeat the Abyssal Foundry overseers"),
+                        objective(DungeonTypes.ObjectiveType.COLLECTION, "unbind_monarch_seals", "basilica_relics", 6,
+                                20 * 60 * 5, "Unbind six monarch seals in the basilica"),
+                        objective(DungeonTypes.ObjectiveType.ELITE, "break_prison_wardens", "prison_wardens", 6,
+                                20 * 60 * 5, "Break the wardens of the Chained Prison"),
+                        objective(DungeonTypes.ObjectiveType.WAVE, "clear_sunken_court", "sunken_legion", 14,
+                                20 * 60 * 6, "Clear the Sunken Court"),
+                        objective(DungeonTypes.ObjectiveType.BOSS, "defeat_abyssal_monarch", "abyssal_monarch", 1,
+                                20 * 60 * 8, "Defeat the Abyssal Monarch"),
+                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_necropolis_heart", "reward_room", 1,
+                                20 * 60 * 2, "Enter the Heart Vault")
+                ), waves, reward(9_000, 4_000,
+                        item("minecraft:netherite_scrap", 3), item("minecraft:diamond", 8),
+                        item("minecraft:echo_shard", 6), item("minecraft:enchanted_golden_apple", 1))
         ));
     }
 
@@ -97,7 +78,8 @@ public final class DungeonContent {
 
     private static void template(DungeonTypes.DungeonTemplate definition) { TEMPLATES.put(definition.id(), definition); }
     private static void enemy(DungeonTypes.EnemyDefinition definition) { ENEMIES.put(definition.id(), definition); }
-    private static DungeonTypes.ObjectiveDefinition objective(DungeonTypes.ObjectiveType type, String id, String encounter, int target, int ticks, String name) {
+    private static DungeonTypes.ObjectiveDefinition objective(DungeonTypes.ObjectiveType type, String id,
+                                                               String encounter, int target, int ticks, String name) {
         return new DungeonTypes.ObjectiveDefinition(type, id, encounter, target, ticks, name);
     }
     private static DungeonTypes.SpawnEntry spawn(String id, int count) { return new DungeonTypes.SpawnEntry(id, count); }
@@ -109,7 +91,9 @@ public final class DungeonContent {
         for (DungeonTypes.WaveDefinition definition : definitions) map.put(definition.id(), definition);
         return map;
     }
-    private static DungeonTypes.ItemReward item(String id, int count) { return new DungeonTypes.ItemReward(new ResourceLocation(id), count); }
+    private static DungeonTypes.ItemReward item(String id, int count) {
+        return new DungeonTypes.ItemReward(new ResourceLocation(id), count);
+    }
     private static DungeonTypes.RewardDefinition reward(int xp, int gold, DungeonTypes.ItemReward... items) {
         return new DungeonTypes.RewardDefinition(xp, gold, List.of(items));
     }

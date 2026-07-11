@@ -24,4 +24,27 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl shadow capacity add <player> <amount>` | Increase storage capacity |
 | `/sl giveall <player>` | Grant all registered mod items |
 | `/sl sync <player>` | Force an owner-data sync |
-| `/sl dungeon open <abandoned_subway\|red_orc_outpost\|demon_castle_foyer\|cartenon_temple>` | Spawn a correctly ranked portal for one of the four authored dungeon maps |
+| `/sl dungeon open master` | Spawn the A-rank Abyssal Necropolis portal |
+
+
+## Master dungeon commands
+
+| Command | Purpose |
+|---|---|
+| `/sl dungeon generate master [seed]` | Spawn the fixed master-dungeon gate; seed is accepted for test workflow compatibility |
+| `/sl dungeon enter master` | Create a debug gate, enter, and start the dungeon immediately |
+| `/sl dungeon exit` | Return to the saved safe location |
+| `/sl dungeon regenerate master` | Clear and rebuild the active master arena |
+| `/sl dungeon delete master` | Delete the active session and restore its arena envelope |
+| `/sl dungeon validate master` | Validate objective markers, support, collision, and liquids |
+| `/sl dungeon info master` | Show measured layout information |
+| `/sl dungeon debug bounds` | Display particles at the authored outer corners |
+| `/sl dungeon debug shell` | Run shell/marker validation |
+| `/sl dungeon debug encounters` | List authored encounter regions |
+| `/sl dungeon debug lighting` | Describe the active lighting palette |
+| `/sl dungeon teleport <region>` | Teleport safely to an authored debug region |
+| `/sl dungeon complete` | Complete the current dungeon for testing |
+
+## Master dungeon generation behavior
+
+Entering or regenerating `master` queues staged generation rather than changing the whole arena in one tick. Use `/sl dungeon inspect_session` to see percentage, elapsed job ticks, changed blocks, and the enforced per-tick maximum. Portal entry can queue the dungeon start; it begins automatically after validation and safe teleportation.

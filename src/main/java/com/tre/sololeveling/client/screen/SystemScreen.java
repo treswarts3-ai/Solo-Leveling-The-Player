@@ -66,10 +66,8 @@ public final class SystemScreen extends Screen {
             new StoreProduct("blessed_random_box", 750, "Contains one server-selected System reward.")
     );
     private static final List<DungeonCard> DUNGEONS = List.of(
-            new DungeonCard("Abandoned Subway", "E", 1, "A derelict underground station ending at the Subway Warden."),
-            new DungeonCard("Red Orc Outpost", "B", 30, "A fortified subterranean war camp with an infernal forge."),
-            new DungeonCard("Demon Castle Foyer", "A", 50, "An obsidian castle approach ruled by the Iron Sovereign."),
-            new DungeonCard("Cartenon Temple", "S", 70, "A lethal commandment trial beneath the Architect's Idol.")
+            new DungeonCard("Abyssal Necropolis", "A", 40,
+                    "A vast buried kingdom with six regions, deep vertical routes, secrets, and the Abyssal Monarch.")
     );
 
     private final EnumMap<Tab, Integer> scrollOffsets = new EnumMap<>(Tab.class);

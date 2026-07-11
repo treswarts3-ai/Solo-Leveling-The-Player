@@ -40,7 +40,7 @@ public final class DungeonTypes {
         }
     }
 
-    public enum SessionState { WAITING, ACTIVE, COMPLETED, FAILED, CLEANUP }
+    public enum SessionState { BUILDING, WAITING, ACTIVE, COMPLETED, FAILED, CLEANUP }
     public enum ObjectiveType { WAVE, COLLECTION, ELITE, BOSS, REWARD }
     public enum EnemyKind { MELEE, FAST, TANK, RANGED, ELITE }
 

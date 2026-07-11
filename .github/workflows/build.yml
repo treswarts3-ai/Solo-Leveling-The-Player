@@ -37,14 +37,22 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v4
 
-      - name: Validate authored dungeon structures
+      - name: Validate master dungeon design
         shell: bash
         run: |
           set -euo pipefail
-          python tools/generate_dungeon_structures.py --output /tmp/solo-leveling-dungeons
-          for file in src/main/resources/data/sololeveling/structures/dungeons/*.nbt; do
-            cmp "$file" "/tmp/solo-leveling-dungeons/${file##*/}"
-          done
+          python tools/generate_dungeon_structures.py --manifest /tmp/master-dungeon-metrics.json
+          test ! -e src/main/resources/data/sololeveling/structures/dungeons/abandoned_subway.nbt
+          test ! -e src/main/resources/data/sololeveling/structures/dungeons/red_orc_outpost.nbt
+          test ! -e src/main/resources/data/sololeveling/structures/dungeons/demon_castle_foyer.nbt
+          test ! -e src/main/resources/data/sololeveling/structures/dungeons/cartenon_temple.nbt
+          ! grep -R -n -E 'abandoned_subway|red_orc_outpost|demon_castle_foyer|cartenon_temple' \
+            src/main/java/com/tre/sololeveling/dungeon src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java docs/COMMANDS.md docs/DUNGEONS.md
+          grep -q 'MAX_BLOCK_VISITS_PER_TICK = 16_384' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
+          grep -q 'MAX_BLOCK_CHANGES_PER_TICK = 4_096' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
+          grep -q 'SessionState { BUILDING, WAITING' src/main/java/com/tre/sololeveling/dungeon/DungeonTypes.java
+          grep -q 'DungeonArena.tickJobs(server)' src/main/java/com/tre/sololeveling/dungeon/DungeonRuntime.java
+          ! grep -R -n 'MasterDungeonBuilder\.build(' src/main/java/com/tre/sololeveling/dungeon
 
       - name: Validate System UI assets
         shell: bash
