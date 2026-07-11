@@ -3,13 +3,17 @@ package com.tre.sololeveling.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.tre.sololeveling.SoloLevelingMod;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Mod.EventBusSubscriber(modid = SoloLevelingMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
 public final class ClientKeyMappings {
@@ -43,31 +47,20 @@ public final class ClientKeyMappings {
     public static final KeyMapping DRAGONS_FEAR = ability("dragons_fear", GLFW.GLFW_KEY_UNKNOWN);
 
     public static final List<AbilityBinding> ABILITIES = List.of(
-            bind(DASH, "dash"),
-            bind(QUICKSILVER, "quicksilver"),
-            bind(SHADOW_STEP, "shadow_step"),
-            bind(DAGGER_MASTERY, "dagger_mastery"),
-            bind(MUTILATION, "mutilation"),
-            bind(DAGGER_RUSH, "dagger_rush"),
-            bind(BLOODLUST, "bloodlust"),
-            bind(AREA_SLASH, "area_slash"),
-            bind(STEALTH, "stealth"),
-            bind(RULERS_AUTHORITY, "rulers_authority"),
-            bind(RULERS_AUTHORITY_PULL, "rulers_authority_pull"),
-            bind(RULERS_AUTHORITY_PUSH, "rulers_authority_push"),
-            bind(RULERS_AUTHORITY_HOLD, "rulers_authority_hold"),
-            bind(RULERS_AUTHORITY_THROW, "rulers_authority_throw"),
-            bind(RULERS_AUTHORITY_DASH, "rulers_authority_dash"),
-            bind(RULERS_AUTHORITY_FLIGHT, "rulers_authority_flight"),
-            bind(ENHANCED_SENSES, "enhanced_senses"),
-            bind(MONARCH_DOMAIN, "monarch_domain"),
-            bind(SHADOW_EXCHANGE, "shadow_exchange"),
-            bind(SHADOW_EXTRACTION, "shadow_extraction"),
-            bind(SHADOW_SUMMONING, "shadow_summoning"),
+            bind(DASH, "dash"), bind(QUICKSILVER, "quicksilver"), bind(SHADOW_STEP, "shadow_step"),
+            bind(DAGGER_MASTERY, "dagger_mastery"), bind(MUTILATION, "mutilation"), bind(DAGGER_RUSH, "dagger_rush"),
+            bind(BLOODLUST, "bloodlust"), bind(AREA_SLASH, "area_slash"), bind(STEALTH, "stealth"),
+            bind(RULERS_AUTHORITY, "rulers_authority"), bind(RULERS_AUTHORITY_PULL, "rulers_authority_pull"),
+            bind(RULERS_AUTHORITY_PUSH, "rulers_authority_push"), bind(RULERS_AUTHORITY_HOLD, "rulers_authority_hold"),
+            bind(RULERS_AUTHORITY_THROW, "rulers_authority_throw"), bind(RULERS_AUTHORITY_DASH, "rulers_authority_dash"),
+            bind(RULERS_AUTHORITY_FLIGHT, "rulers_authority_flight"), bind(ENHANCED_SENSES, "enhanced_senses"),
+            bind(MONARCH_DOMAIN, "monarch_domain"), bind(SHADOW_EXCHANGE, "shadow_exchange"),
+            bind(SHADOW_EXTRACTION, "shadow_extraction"), bind(SHADOW_SUMMONING, "shadow_summoning"),
             bind(DRAGONS_FEAR, "dragons_fear")
     );
+    private static final Map<String, KeyMapping> BY_ABILITY = createIndex();
 
-    // Compatibility aliases for older client code and saved control names.
+    // Compatibility aliases for existing code and saved control names.
     public static final KeyMapping PRIMARY = MUTILATION;
     public static final KeyMapping SECONDARY = DAGGER_RUSH;
     public static final KeyMapping EXTRACT = SHADOW_EXTRACTION;
@@ -75,16 +68,45 @@ public final class ClientKeyMappings {
     public static final KeyMapping AUTHORITY = RULERS_AUTHORITY;
     public static final KeyMapping DODGE = DASH;
 
-    private static KeyMapping key(String name, int code) {
-        return new KeyMapping(name, InputConstants.Type.KEYSYM, code, CATEGORY);
+    private static KeyMapping key(String name, int code) { return new KeyMapping(name, InputConstants.Type.KEYSYM, code, CATEGORY); }
+    private static KeyMapping ability(String id, int code) { return key("key.sololeveling.ability." + id, code); }
+    private static AbilityBinding bind(KeyMapping mapping, String abilityId) { return new AbilityBinding(mapping, abilityId); }
+    private static Map<String, KeyMapping> createIndex() {
+        Map<String, KeyMapping> result = new LinkedHashMap<>();
+        for (AbilityBinding binding : ABILITIES) result.put(binding.abilityId, binding.mapping);
+        return Map.copyOf(result);
     }
 
-    private static KeyMapping ability(String id, int code) {
-        return key("key.sololeveling.ability." + id, code);
+    public static KeyMapping forAbility(String id) {
+        return BY_ABILITY.get(normalize(id));
     }
 
-    private static AbilityBinding bind(KeyMapping mapping, String abilityId) {
-        return new AbilityBinding(mapping, abilityId);
+    public static String keyName(String id) {
+        KeyMapping mapping = forAbility(id);
+        if (mapping == null || mapping.isUnbound()) return "UNBOUND";
+        return mapping.getTranslatedKeyMessage().getString().toUpperCase(Locale.ROOT);
+    }
+
+    public static boolean hasConflict(String id) {
+        KeyMapping mapping = forAbility(id);
+        if (mapping == null || mapping.isUnbound()) return false;
+        String key = mapping.getTranslatedKeyMessage().getString();
+        int matches = 0;
+        for (AbilityBinding binding : ABILITIES) {
+            if (!binding.mapping.isUnbound() && key.equals(binding.mapping.getTranslatedKeyMessage().getString())) matches++;
+        }
+        return matches > 1;
+    }
+
+    public static void resetAbilityBindings() {
+        for (AbilityBinding binding : ABILITIES) binding.mapping.setKey(binding.mapping.getDefaultKey());
+        KeyMapping.resetMapping();
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.options != null) minecraft.options.save();
+    }
+
+    private static String normalize(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replace(' ', '_').replace('-', '_');
     }
 
     @SubscribeEvent
@@ -92,12 +114,9 @@ public final class ClientKeyMappings {
         event.register(SYSTEM);
         event.register(SHADOWS);
         event.register(HUD);
-        for (AbilityBinding binding : ABILITIES) event.register(binding.mapping());
+        for (AbilityBinding binding : ABILITIES) event.register(binding.mapping);
     }
 
-    public record AbilityBinding(KeyMapping mapping, String abilityId) {
-    }
-
-    private ClientKeyMappings() {
-    }
+    public record AbilityBinding(KeyMapping mapping, String abilityId) { }
+    private ClientKeyMappings() { }
 }
