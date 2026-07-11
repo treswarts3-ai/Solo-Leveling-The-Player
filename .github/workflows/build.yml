@@ -1,4 +1,4 @@
-name: Apply Bounded Dungeon Generation
+name: Snapshot Master Dungeon Branch
 
 on:
   push:
@@ -9,10 +9,10 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  apply:
+  snapshot:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -23,20 +23,13 @@ jobs:
           fetch-depth: 1
           show-progress: false
 
-      - name: Apply bounded generation payload
-        shell: bash
-        run: python tools/apply_perf_patch.py
-
-      - name: Commit bounded generation patch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No generated changes"
-            exit 0
-          fi
-          git commit -m "Stage master dungeon generation across server ticks"
-          git push origin HEAD:feature/master-dungeon-rebuild
+      - name: Upload readable source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: master-dungeon-branch-source
+          retention-days: 2
+          path: |
+            src/**
+            docs/**
+            tools/**
+            .github/workflows/build.yml
