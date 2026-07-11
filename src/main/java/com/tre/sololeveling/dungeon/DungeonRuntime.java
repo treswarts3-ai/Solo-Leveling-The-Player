@@ -34,7 +34,7 @@ public final class DungeonRuntime {
         public static Result fail(String message) { return new Result(false, message); }
     }
 
-    public static final int ARENA_LAYOUT_VERSION = 3;
+    public static final int ARENA_LAYOUT_VERSION = 4;
 
     private static final Map<UUID, Integer> MISSING_BOSS_TICKS = new HashMap<>();
     private static final String PLAYER_RETURN_TAG = "sl_dungeon_return";
@@ -109,7 +109,7 @@ public final class DungeonRuntime {
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(slot));
         session.setLastActiveGameTime(dungeonLevel.getGameTime());
         if (!DungeonArena.build(dungeonLevel, session)) {
-            return Result.fail("Dungeon structure template could not be loaded");
+            return Result.fail("Master dungeon could not be built");
         }
         session.setArenaVersion(ARENA_LAYOUT_VERSION);
         BlockPos entry = DungeonArena.findSafePlayerPosition(dungeonLevel, DungeonArena.entryPoint(session), 6);
@@ -212,7 +212,7 @@ public final class DungeonRuntime {
         DungeonArena.clearLegacyArena(level, session);
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(session.arenaSlot()));
         if (!DungeonArena.build(level, session)) {
-            fail(server, session, "Dungeon structure template could not be recovered");
+            fail(server, session, "Master dungeon could not be recovered");
             return false;
         }
         session.setArenaVersion(ARENA_LAYOUT_VERSION);
@@ -558,6 +558,89 @@ public final class DungeonRuntime {
                 : DungeonBoss.spawn(level, session, template.rank());
         DungeonSavedData.get(player.server).setDirty();
         return boss == null ? Result.fail("Boss spawn failed") : Result.ok("Spawned the template boss");
+    }
+
+
+    public static Result enterTemplate(ServerPlayer player, String templateId) {
+        DungeonTypes.DungeonTemplate template = DungeonContent.template(templateId);
+        if (template == null) return Result.fail("Unknown dungeon: " + templateId);
+        String gateId = "debug_" + template.id() + "_" + Long.toString(player.level().getGameTime(), 36);
+        Result created = createGate(player, gateId, template.rank(), template.id());
+        if (!created.success()) return created;
+        Result entered = enterGate(player, gateId);
+        if (!entered.success()) return entered;
+        Result started = start(player);
+        return started.success() ? Result.ok("Entered " + template.displayName() + " through debug gate " + gateId) : started;
+    }
+
+    public static Result regenerate(ServerPlayer player) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("Enter the master dungeon first");
+        ServerLevel level = player.server.getLevel(session.dungeonDimension());
+        if (level == null) return Result.fail("Dungeon dimension unavailable");
+        discardEncounterState(level, session);
+        DungeonArena.clear(level, session);
+        if (!DungeonArena.build(level, session)) return Result.fail("Master dungeon rebuild failed");
+        session.setArenaVersion(ARENA_LAYOUT_VERSION);
+        BlockPos entry = DungeonArena.findSafePlayerPosition(level, DungeonArena.entryPoint(session), 8);
+        if (entry == null) return Result.fail("Rebuilt dungeon entry is unsafe");
+        player.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
+        DungeonSavedData.get(player.server).setDirty();
+        return Result.ok("Regenerated " + MasterDungeonBuilder.DISPLAY_NAME);
+    }
+
+    public static Result deleteCurrent(ServerPlayer player) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("No dungeon session found");
+        cleanup(player.server, session, true);
+        return Result.ok("Deleted the active master dungeon session");
+    }
+
+    public static Result validateCurrent(ServerPlayer player) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("Enter the master dungeon first");
+        ServerLevel level = player.server.getLevel(session.dungeonDimension());
+        if (level == null) return Result.fail("Dungeon dimension unavailable");
+        List<String> errors = DungeonArena.validate(level, session);
+        return errors.isEmpty() ? Result.ok("Validation passed: " + DungeonArena.info(session))
+                : Result.fail("Validation failed (" + errors.size() + "): " + String.join("; ", errors.subList(0, Math.min(6, errors.size()))));
+    }
+
+    public static Result teleportRegion(ServerPlayer player, String region) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("Enter the master dungeon first");
+        ServerLevel level = player.server.getLevel(session.dungeonDimension());
+        BlockPos target = DungeonArena.regionPoint(session, region);
+        if (level == null || target == null) return Result.fail("Unknown dungeon region: " + region);
+        BlockPos safe = DungeonArena.findSafePlayerPosition(level, target, 8);
+        if (safe == null) return Result.fail("Region has no safe teleport position");
+        player.teleportTo(level, safe.getX() + 0.5D, safe.getY(), safe.getZ() + 0.5D, 0.0F, 0.0F);
+        return Result.ok("Teleported to " + region);
+    }
+
+    public static Result debugBounds(ServerPlayer player) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("Enter the master dungeon first");
+        ServerLevel level = player.server.getLevel(session.dungeonDimension());
+        if (level == null) return Result.fail("Dungeon dimension unavailable");
+        DungeonArena.debugBounds(level, session);
+        return Result.ok("Displayed master dungeon bounds");
+    }
+
+    public static Result completeCurrent(ServerPlayer player) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) return Result.fail("No dungeon session found");
+        complete(player.server, session);
+        return Result.ok("Completed the master dungeon");
+    }
+
+    private static void discardEncounterState(ServerLevel level, DungeonSession session) {
+        DungeonArena.discardSessionEntities(level, session);
+        DungeonBoss.remove(session);
+        session.setBossId(null);
+        session.setEncounterSpawned(false);
+        session.setRewardRoomCreated(false);
+        session.setLiveEnemyCount(0);
     }
 
     public static DungeonSession findSession(MinecraftServer server, UUID playerId) {

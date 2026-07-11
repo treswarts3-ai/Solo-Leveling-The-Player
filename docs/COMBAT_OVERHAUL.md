@@ -80,7 +80,7 @@ The role controller only visits entities already tracked by active dungeon sessi
 
 ## Boss presentation
 
-- Subway Warden and Iron Sovereign attacks retain their existing schedules and authored arena ownership.
+- Abyssal Monarch attacks retain server-authoritative schedules and authored arena ownership.
 - Cleave, stomp, and directional blast now require line of sight.
 - Damage is limited to players belonging to the dungeon session.
 - Phase two sends a clear notification and continues to guard add spawning against duplication.

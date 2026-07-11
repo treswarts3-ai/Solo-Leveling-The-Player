@@ -1,6 +1,7 @@
 package com.tre.sololeveling.dungeon;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.tre.sololeveling.SoloLevelingMod;
@@ -47,6 +48,65 @@ public final class DungeonEvents {
 
     private static LiteralArgumentBuilder<CommandSourceStack> dungeonCommands() {
         return Commands.literal("dungeon")
+                .then(Commands.literal("generate").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.createTemplateGate(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "template"))))
+                                .then(Commands.argument("seed", LongArgumentType.longArg())
+                                        .executes(context -> send(context.getSource(), DungeonRuntime.createTemplateGate(
+                                                context.getSource().getPlayerOrException(),
+                                                StringArgumentType.getString(context, "template")))))))
+                .then(Commands.literal("enter").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.enterTemplate(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "template"))))))
+                .then(Commands.literal("exit")
+                        .executes(context -> send(context.getSource(), DungeonRuntime.exit(
+                                context.getSource().getPlayerOrException()))))
+                .then(Commands.literal("regenerate").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.regenerate(
+                                        context.getSource().getPlayerOrException())))))
+                .then(Commands.literal("delete").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.deleteCurrent(
+                                        context.getSource().getPlayerOrException())))))
+                .then(Commands.literal("validate").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.validateCurrent(
+                                        context.getSource().getPlayerOrException())))))
+                .then(Commands.literal("info").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.Result.ok(
+                                        MasterDungeonBuilder.info())))))
+                .then(Commands.literal("teleport").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("region", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(
+                                        new String[] {"entrance", "bridge", "ossuary", "foundry", "plaza", "basilica",
+                                                "prison", "archive", "court", "arena", "reward"}, builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.teleportRegion(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "region"))))))
+                .then(Commands.literal("complete").requires(source -> source.hasPermission(2))
+                        .executes(context -> send(context.getSource(), DungeonRuntime.completeCurrent(
+                                context.getSource().getPlayerOrException()))))
+                .then(Commands.literal("debug").requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("bounds").executes(context -> send(context.getSource(),
+                                DungeonRuntime.debugBounds(context.getSource().getPlayerOrException()))))
+                        .then(Commands.literal("shell").executes(context -> send(context.getSource(),
+                                DungeonRuntime.validateCurrent(context.getSource().getPlayerOrException()))))
+                        .then(Commands.literal("encounters").executes(context -> send(context.getSource(),
+                                DungeonRuntime.Result.ok("Encounter markers: bridge, ossuary, plaza, foundry, basilica, prison, court, arena, reward"))))
+                        .then(Commands.literal("lighting").executes(context -> send(context.getSource(),
+                                DungeonRuntime.Result.ok("Lighting palette uses sea lanterns, soul lanterns, shroomlights, and hidden landmark lighting")))))
                 .then(Commands.literal("open").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("template", StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
