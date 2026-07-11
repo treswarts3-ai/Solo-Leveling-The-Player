@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - feature/master-dungeon-rebuild
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -13,9 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout branch
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
+          ref: feature/master-dungeon-rebuild
           fetch-depth: 0
 
       - name: Apply complete rebuild payload
@@ -34,4 +38,4 @@ jobs:
             exit 0
           fi
           git commit -m "Build the Abyssal Necropolis master dungeon"
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git push origin HEAD:feature/master-dungeon-rebuild
