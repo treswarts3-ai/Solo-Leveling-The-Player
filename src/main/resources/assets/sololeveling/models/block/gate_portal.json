@@ -2,21 +2,41 @@
   "ambientocclusion": false,
   "render_type": "translucent",
   "textures": {
-    "portal": "minecraft:block/soul_fire_0",
-    "particle": "minecraft:block/soul_fire_0"
+    "portal": "sololeveling:block/gate_portal_e",
+    "particle": "sololeveling:block/gate_portal_e"
   },
   "elements": [
     {
-      "from": [0, 0, 7],
-      "to": [16, 16, 9],
+      "from": [
+        0,
+        0,
+        6
+      ],
+      "to": [
+        16,
+        16,
+        10
+      ],
       "shade": false,
       "faces": {
-        "north": { "texture": "#portal" },
-        "south": { "texture": "#portal" },
-        "east": { "texture": "#portal" },
-        "west": { "texture": "#portal" },
-        "up": { "texture": "#portal" },
-        "down": { "texture": "#portal" }
+        "north": {
+          "texture": "#portal"
+        },
+        "south": {
+          "texture": "#portal"
+        },
+        "east": {
+          "texture": "#portal"
+        },
+        "west": {
+          "texture": "#portal"
+        },
+        "up": {
+          "texture": "#portal"
+        },
+        "down": {
+          "texture": "#portal"
+        }
       }
     }
   ]

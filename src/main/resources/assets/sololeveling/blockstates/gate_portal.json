@@ -1,7 +1,22 @@
 {
   "variants": {
-    "": {
+    "rank=e": {
       "model": "sololeveling:block/gate_portal"
+    },
+    "rank=d": {
+      "model": "sololeveling:block/gate_portal_d"
+    },
+    "rank=c": {
+      "model": "sololeveling:block/gate_portal_c"
+    },
+    "rank=b": {
+      "model": "sololeveling:block/gate_portal_b"
+    },
+    "rank=a": {
+      "model": "sololeveling:block/gate_portal_a"
+    },
+    "rank=s": {
+      "model": "sololeveling:block/gate_portal_s"
     }
   }
 }
