@@ -1,79 +1,37 @@
-name: Forge Build
+name: Apply Master Dungeon Rebuild
 
 on:
   push:
     branches:
-      - main
-      - integration
-      - 'feature/**'
-      - 'fix/**'
-  pull_request:
-    branches:
-      - main
-      - integration
+      - feature/master-dungeon-rebuild
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  build:
+  apply:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
+          fetch-depth: 0
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Apply complete rebuild payload
+        shell: bash
+        run: python tools/apply_master_dungeon_patch.py
 
-      - name: Validate Gradle wrapper
-        uses: gradle/actions/wrapper-validation@v4
-
-      - name: Validate authored dungeon structures
+      - name: Commit master dungeon rebuild
         shell: bash
         run: |
           set -euo pipefail
-          python tools/generate_dungeon_structures.py --output /tmp/solo-leveling-dungeons
-          for file in src/main/resources/data/sololeveling/structures/dungeons/*.nbt; do
-            cmp "$file" "/tmp/solo-leveling-dungeons/${file##*/}"
-          done
-
-      - name: Validate System UI assets
-        shell: bash
-        run: python tools/validate_ui_assets.py
-
-      - name: Build Forge mod
-        shell: bash
-        run: |
-          set -o pipefail
-          chmod +x gradlew
-          ./gradlew clean build --stacktrace --no-daemon 2>&1 | tee build.log
-
-      - name: Upload build outputs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: solo-leveling-build
-          if-no-files-found: warn
-          retention-days: 14
-          path: |
-            build.log
-            build/libs/*.jar
-            build/reports/**
-            src/**
-            docs/**
-            tools/**
-            README.md
-            build.gradle
-            gradle.properties
-            settings.gradle
-            gradlew
-            gradle/wrapper/**
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "Build the Abyssal Necropolis master dungeon"
+          git push origin HEAD:${GITHUB_REF_NAME}
