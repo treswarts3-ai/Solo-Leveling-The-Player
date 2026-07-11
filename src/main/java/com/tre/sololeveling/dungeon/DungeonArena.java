@@ -34,6 +34,10 @@ public final class DungeonArena {
     private static final int SHELL_MAX_Y = 20;
     private static final int SHELL_MIN_Z = -46;
     private static final int SHELL_MAX_Z = 46;
+    private static final int GATE_MIN_X = -3;
+    private static final int GATE_MAX_X = 3;
+    private static final int GATE_MIN_Y = 0;
+    private static final int GATE_MAX_Y = 6;
 
     private static final Map<String, Layout> LAYOUTS = Map.of(
             "abandoned_subway", new Layout(
@@ -213,34 +217,71 @@ public final class DungeonArena {
 
     public static void placeGateMarker(ServerLevel level, DungeonTypes.GateDefinition gate) {
         BlockPos base = gate.position();
-        for (int x = -2; x <= 2; x++) {
-            for (int y = 0; y <= 4; y++) {
-                boolean frame = x == -2 || x == 2 || y == 0 || y == 4;
-                set(level, base.offset(x, y, 0), frame
-                        ? Blocks.CRYING_OBSIDIAN.defaultBlockState()
-                        : DungeonBlocks.GATE_PORTAL.get().defaultBlockState());
+        BlockState frame = GateVisuals.frame(gate.rank());
+        BlockState accent = GateVisuals.accent(gate.rank());
+        BlockState portal = DungeonBlocks.GATE_PORTAL.get().defaultBlockState()
+                .setValue(GatePortalBlock.RANK, gate.rank());
+
+        for (int x = GATE_MIN_X; x <= GATE_MAX_X; x++) {
+            for (int y = GATE_MIN_Y; y <= GATE_MAX_Y; y++) {
+                BlockPos pos = base.offset(x, y, 0);
+                if (isGateFrameCoordinate(x, y)) {
+                    set(level, pos, isGateAccentCoordinate(x, y) ? accent : frame);
+                } else if (isGatePortalCoordinate(x, y)) {
+                    set(level, pos, portal);
+                } else if (GateVisuals.isManagedGateBlock(level.getBlockState(pos))) {
+                    set(level, pos, Blocks.AIR.defaultBlockState());
+                }
             }
+        }
+
+        for (int z : new int[] {-1, 1}) {
+            set(level, base.offset(-3, 0, z), accent);
+            set(level, base.offset(3, 0, z), accent);
+            set(level, base.offset(-3, 1, z), frame);
+            set(level, base.offset(3, 1, z), frame);
         }
     }
 
     public static AABB gateTrigger(DungeonTypes.GateDefinition gate) {
         BlockPos base = gate.position();
-        return new AABB(base.getX() - 1.15D, base.getY() + 0.5D, base.getZ() - 0.75D,
-                base.getX() + 2.15D, base.getY() + 4.0D, base.getZ() + 1.75D);
+        return new AABB(base.getX() - 2.35D, base.getY() + 0.5D, base.getZ() - 0.95D,
+                base.getX() + 3.35D, base.getY() + 5.8D, base.getZ() + 1.95D);
     }
 
     public static void removeGateMarker(ServerLevel level, DungeonTypes.GateDefinition gate) {
         BlockPos base = gate.position();
-        for (int x = -2; x <= 2; x++) {
-            for (int y = 0; y <= 4; y++) {
-                BlockPos pos = base.offset(x, y, 0);
-                BlockState state = level.getBlockState(pos);
-                if (state.is(Blocks.CRYING_OBSIDIAN) || state.is(Blocks.PURPLE_STAINED_GLASS)
-                        || state.is(DungeonBlocks.GATE_PORTAL.get())) {
-                    set(level, pos, Blocks.AIR.defaultBlockState());
+        for (int x = GATE_MIN_X; x <= GATE_MAX_X; x++) {
+            for (int y = GATE_MIN_Y; y <= GATE_MAX_Y; y++) {
+                for (int z = -1; z <= 1; z++) {
+                    BlockPos pos = base.offset(x, y, z);
+                    if (GateVisuals.isManagedGateBlock(level.getBlockState(pos))) {
+                        set(level, pos, Blocks.AIR.defaultBlockState());
+                    }
                 }
             }
         }
+    }
+
+    private static boolean isGateFrameCoordinate(int x, int y) {
+        int absoluteX = Math.abs(x);
+        if (y == 0) return absoluteX <= 3;
+        if (y >= 1 && y <= 4) return absoluteX == 3;
+        if (y == 5) return absoluteX >= 2 && absoluteX <= 3;
+        return y == 6 && absoluteX <= 1;
+    }
+
+    private static boolean isGatePortalCoordinate(int x, int y) {
+        int absoluteX = Math.abs(x);
+        return (y >= 1 && y <= 4 && absoluteX <= 2)
+                || (y == 5 && absoluteX <= 1);
+    }
+
+    private static boolean isGateAccentCoordinate(int x, int y) {
+        int absoluteX = Math.abs(x);
+        return (y == 0 && (absoluteX == 0 || absoluteX == 3))
+                || (y == 4 && absoluteX == 3)
+                || (y == 6 && x == 0);
     }
 
     public static void discardSessionEntities(ServerLevel level, DungeonSession session) {
