@@ -1,7 +1,9 @@
 package com.tre.sololeveling.dungeon;
 
+import com.tre.sololeveling.SoloLevelingMod;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
@@ -11,217 +13,142 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
+import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.AABB;
 
+import java.util.List;
+import java.util.Map;
+
 public final class DungeonArena {
-    public static final int RADIUS = 46;
-    public static final int HEIGHT = 14;
+    public static final int RADIUS = 48;
+    public static final int HEIGHT = 24;
+
     private static final int STRUCTURE_UPDATE_FLAGS = Block.UPDATE_CLIENTS;
+    private static final int TEMPLATE_MIN_X = -44;
+    private static final int TEMPLATE_MIN_Y = -2;
+    private static final int TEMPLATE_MIN_Z = -44;
+    private static final int SHELL_MIN_X = -46;
+    private static final int SHELL_MAX_X = 46;
+    private static final int SHELL_MIN_Y = -4;
+    private static final int SHELL_MAX_Y = 20;
+    private static final int SHELL_MIN_Z = -46;
+    private static final int SHELL_MAX_Z = 46;
+
+    private static final Map<String, Layout> LAYOUTS = Map.of(
+            "abandoned_subway", new Layout(
+                    structure("abandoned_subway"), Blocks.DEEPSLATE.defaultBlockState(),
+                    offset(0, 1, -38),
+                    List.of(offset(-5, 1, -8), offset(35, 1, 2), offset(25, 1, 21),
+                            offset(0, 1, 35), offset(-36, 1, 38)),
+                    offset(0, 1, 35), offset(-36, 1, 38),
+                    List.of(
+                            Doorway.xPlane(29, 1, 4, -7, -3, Blocks.IRON_BARS.defaultBlockState()),
+                            Doorway.zPlane(15, 1, 4, 33, 37, Blocks.IRON_BARS.defaultBlockState()),
+                            Doorway.zPlane(28, 1, 5, 18, 22, Blocks.IRON_BARS.defaultBlockState()),
+                            Doorway.xPlane(-24, 1, 4, 32, 36, Blocks.IRON_BARS.defaultBlockState())
+                    )),
+            "red_orc_outpost", new Layout(
+                    structure("red_orc_outpost"), Blocks.COBBLED_DEEPSLATE.defaultBlockState(),
+                    offset(0, 1, -39),
+                    List.of(offset(0, 1, -22), offset(0, 1, 14), offset(-18, 1, 33), offset(24, 1, 39)),
+                    offset(-18, 1, 33), offset(24, 1, 39),
+                    List.of(
+                            Doorway.zPlane(-13, 1, 5, -4, 4, Blocks.IRON_BARS.defaultBlockState()),
+                            Doorway.zPlane(24, 1, 5, -4, 4, Blocks.IRON_BARS.defaultBlockState()),
+                            Doorway.xPlane(10, 1, 5, 32, 36, Blocks.IRON_BARS.defaultBlockState())
+                    )),
+            "demon_castle_foyer", new Layout(
+                    structure("demon_castle_foyer"), Blocks.BLACKSTONE.defaultBlockState(),
+                    offset(0, 2, -39),
+                    List.of(offset(0, 1, -16), offset(33, 1, 2), offset(0, 1, 10),
+                            offset(0, 1, 34), offset(-36, 1, 39)),
+                    offset(0, 1, 34), offset(-36, 1, 39),
+                    List.of(
+                            Doorway.zPlane(-7, 1, 6, 28, 34, Blocks.RED_STAINED_GLASS.defaultBlockState()),
+                            Doorway.xPlane(19, 1, 6, 12, 16, Blocks.RED_STAINED_GLASS.defaultBlockState()),
+                            Doorway.zPlane(23, 1, 6, -4, 4, Blocks.RED_STAINED_GLASS.defaultBlockState()),
+                            Doorway.xPlane(-28, 1, 6, 32, 36, Blocks.RED_STAINED_GLASS.defaultBlockState())
+                    )),
+            "cartenon_temple", new Layout(
+                    structure("cartenon_temple"), Blocks.STONE.defaultBlockState(),
+                    offset(0, 2, -39),
+                    List.of(offset(0, 1, -8), offset(-30, 1, 13), offset(0, 1, 10),
+                            offset(0, 1, 34), offset(39, 1, 40)),
+                    offset(0, 1, 34), offset(39, 1, 40),
+                    List.of(
+                            Doorway.zPlane(5, 1, 6, -37, -31, Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState()),
+                            Doorway.xPlane(-18, 1, 6, 13, 17, Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState()),
+                            Doorway.zPlane(25, 1, 7, -4, 4, Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState()),
+                            Doorway.xPlane(34, 1, 6, 33, 37, Blocks.LIGHT_BLUE_STAINED_GLASS.defaultBlockState())
+                    ))
+    );
 
     public static BlockPos originForSlot(int slot) {
         int x = slot % 40;
         int z = slot / 40;
-        return new BlockPos(50000 + x * 104, 76, 50000 + z * 104);
+        return new BlockPos(50000 + x * 104, -32, 50000 + z * 104);
     }
 
     public static AABB bounds(DungeonSession session) {
         BlockPos origin = session.arenaOrigin();
-        return new AABB(origin.getX() - RADIUS - 2, origin.getY() - 2, origin.getZ() - RADIUS - 2,
-                origin.getX() + RADIUS + 3, origin.getY() + HEIGHT + 5, origin.getZ() + RADIUS + 3);
+        return new AABB(origin.getX() - RADIUS, origin.getY() - 5, origin.getZ() - RADIUS,
+                origin.getX() + RADIUS + 1, origin.getY() + HEIGHT, origin.getZ() + RADIUS + 1);
     }
 
-    public static void build(ServerLevel level, DungeonSession session) {
-        clear(level, session);
-        if ("abandoned_subway".equals(session.templateId())) buildAbandonedSubway(level, session);
-        else buildFallbackDungeon(level, session);
+    public static boolean build(ServerLevel level, DungeonSession session) {
+        Layout layout = LAYOUTS.get(session.templateId());
+        if (layout == null) return false;
+        loadArenaChunks(level, session);
+        restoreUndergroundVolume(level, session, layout.shell());
+        BlockPos corner = session.arenaOrigin().offset(TEMPLATE_MIN_X, TEMPLATE_MIN_Y, TEMPLATE_MIN_Z);
+        StructureTemplate template = level.getStructureManager().get(layout.structureId()).orElse(null);
+        if (template == null || template.getSize().getX() <= 0 || template.getSize().getY() <= 0
+                || template.getSize().getZ() <= 0) {
+            session.setArenaBuilt(false);
+            return false;
+        }
+        StructurePlaceSettings settings = new StructurePlaceSettings().setIgnoreEntities(true);
+        if (!template.placeInWorld(level, corner, corner, settings, level.getRandom(), STRUCTURE_UPDATE_FLAGS)) {
+            session.setArenaBuilt(false);
+            return false;
+        }
+        for (Doorway doorway : layout.checkpoints()) doorway.close(level, session.arenaOrigin());
         session.setArenaBuilt(true);
-    }
-
-    private static void buildAbandonedSubway(ServerLevel level, DungeonSession session) {
-        BlockPos origin = session.arenaOrigin();
-        BlockState wall = Blocks.DEEPSLATE_BRICKS.defaultBlockState();
-        BlockState accent = Blocks.CRACKED_DEEPSLATE_BRICKS.defaultBlockState();
-        BlockState floor = Blocks.POLISHED_DEEPSLATE.defaultBlockState();
-        BlockState ceiling = Blocks.DEEPSLATE_TILES.defaultBlockState();
-
-        room(level, origin, -6, 6, -43, -35, 6, wall, floor, ceiling);
-        tunnel(level, origin, -3, 3, -34, -29, 5, wall, floor, ceiling);
-        room(level, origin, -16, 16, -28, -12, 7, wall, floor, ceiling);
-        tunnel(level, origin, -3, 3, -11, -7, 5, wall, floor, ceiling);
-        room(level, origin, -11, 11, -6, 5, 6, wall, floor, ceiling);
-        tunnel(level, origin, -3, 3, 6, 8, 5, wall, floor, ceiling);
-        room(level, origin, -10, 10, 9, 18, 7, wall, floor, ceiling);
-        tunnel(level, origin, -3, 3, 19, 22, 6, wall, floor, ceiling);
-        room(level, origin, -17, 17, 23, 39, 10, Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState(),
-                Blocks.POLISHED_BLACKSTONE.defaultBlockState(), Blocks.BLACKSTONE.defaultBlockState());
-
-        // Explicitly open every room/corridor seam. The previous layout left these wall planes intact.
-        doorway(level, origin, -35, 1, 3);
-        doorway(level, origin, -28, 2, 4);
-        doorway(level, origin, -12, 2, 4);
-        doorway(level, origin, -6, 2, 4);
-        doorway(level, origin, 5, 2, 4);
-        doorway(level, origin, 9, 2, 4);
-        doorway(level, origin, 18, 2, 4);
-        doorway(level, origin, 23, 2, 5);
-
-        // Ticket hall: booths, station marker, turnstiles, and a readable center route.
-        fill(level, origin, -5, 5, 1, 1, -41, -41, Blocks.CHISELED_DEEPSLATE.defaultBlockState());
-        for (int x : new int[]{-4, 4}) {
-            column(level, origin.offset(x, 1, -38), 4, Blocks.POLISHED_BASALT.defaultBlockState());
-            lamp(level, origin.offset(x, 5, -38));
-        }
-        ticketBooth(level, origin.offset(-5, 1, -40));
-        ticketBooth(level, origin.offset(3, 1, -40));
-        fill(level, origin, -3, 3, 4, 4, -43, -43, Blocks.CYAN_CONCRETE.defaultBlockState());
-        fill(level, origin, -2, 2, 4, 4, -42, -42, Blocks.SEA_LANTERN.defaultBlockState());
-        fill(level, origin, -2, 2, 1, 2, -35, -35, Blocks.IRON_BARS.defaultBlockState());
-        carve(level, origin, -1, 1, 1, 3, -35, -35);
-
-        // Platform: raised edges, recessed track bed, rails, columns, benches, rubble, and broken lights.
-        fill(level, origin, -15, -3, 1, 1, -27, -13, Blocks.SMOOTH_STONE.defaultBlockState());
-        fill(level, origin, 3, 15, 1, 1, -27, -13, Blocks.SMOOTH_STONE.defaultBlockState());
-        fill(level, origin, -2, 2, 0, 0, -27, -13, Blocks.GRAVEL.defaultBlockState());
-        fill(level, origin, -1, 1, 0, 0, -27, -13, Blocks.DEEPSLATE.defaultBlockState());
-        fill(level, origin, -3, -3, 1, 1, -27, -13, Blocks.YELLOW_CONCRETE.defaultBlockState());
-        fill(level, origin, 3, 3, 1, 1, -27, -13, Blocks.YELLOW_CONCRETE.defaultBlockState());
-        for (int z = -26; z <= -14; z += 2) {
-            set(level, origin.offset(-1, 1, z), Blocks.RAIL.defaultBlockState());
-            set(level, origin.offset(1, 1, z), Blocks.RAIL.defaultBlockState());
-        }
-        for (int z : new int[]{-25, -19, -13}) {
-            for (int x : new int[]{-12, 12}) {
-                column(level, origin.offset(x, 2, z), 4, Blocks.POLISHED_BASALT.defaultBlockState());
-                if (z != -19) lamp(level, origin.offset(x, 6, z));
-                else set(level, origin.offset(x, 6, z), Blocks.REDSTONE_LAMP.defaultBlockState());
-            }
-        }
-        bench(level, origin.offset(-10, 2, -18));
-        bench(level, origin.offset(8, 2, -23));
-        rubble(level, origin.offset(-13, 2, -15));
-        rubble(level, origin.offset(11, 2, -26));
-        fill(level, origin, -15, -13, 2, 4, -27, -27, accent);
-        fill(level, origin, 13, 15, 2, 5, -13, -13, accent);
-        fill(level, origin, -16, -16, 2, 5, -22, -20, Blocks.BLUE_STAINED_GLASS_PANE.defaultBlockState());
-        set(level, origin.offset(-15, 1, -21), Blocks.CAULDRON.defaultBlockState());
-
-        // Maintenance: pipes, machinery silhouettes, leaks, and a small elevation change.
-        for (int x : new int[]{-8, 8}) {
-            fill(level, origin, x, x, 1, 4, -4, 3, Blocks.COPPER_BLOCK.defaultBlockState());
-            fill(level, origin, x - 1, x + 1, 1, 1, 0, 0, Blocks.CUT_COPPER.defaultBlockState());
-        }
-        fill(level, origin, -9, 9, 5, 5, -4, -4, Blocks.EXPOSED_COPPER.defaultBlockState());
-        fill(level, origin, -5, 5, 1, 1, 3, 4, Blocks.POLISHED_ANDESITE.defaultBlockState());
-        set(level, origin.offset(-7, 1, 3), Blocks.CRAFTING_TABLE.defaultBlockState());
-        set(level, origin.offset(7, 1, 3), Blocks.BARREL.defaultBlockState());
-        set(level, origin.offset(-9, 4, 2), Blocks.LIGHTNING_ROD.defaultBlockState());
-        set(level, origin.offset(9, 4, -2), Blocks.LIGHTNING_ROD.defaultBlockState());
-        for (int x = -9; x <= 9; x += 6) lamp(level, origin.offset(x, 5, 0));
-        rubble(level, origin.offset(4, 1, -3));
-
-        // Security room: barred checkpoint, work stations, and strong room silhouette.
-        fill(level, origin, -8, 8, 1, 2, 11, 11, Blocks.IRON_BARS.defaultBlockState());
-        carve(level, origin, -1, 1, 1, 3, 11, 11);
-        for (int x : new int[]{-7, 7}) {
-            column(level, origin.offset(x, 1, 14), 4, Blocks.POLISHED_BASALT.defaultBlockState());
-            lamp(level, origin.offset(x, 5, 14));
-        }
-        set(level, origin.offset(-5, 1, 16), Blocks.SMITHING_TABLE.defaultBlockState());
-        set(level, origin.offset(5, 1, 16), Blocks.ANVIL.defaultBlockState());
-        fill(level, origin, -3, 3, 5, 5, 18, 18, Blocks.RED_CONCRETE.defaultBlockState());
-
-        // Boss chamber: raised dais, pillars, soul lighting, side rubble, and a sealed vault wall.
-        for (int x : new int[]{-13, 13}) {
-            for (int z : new int[]{26, 36}) {
-                column(level, origin.offset(x, 1, z), 7, Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState());
-                set(level, origin.offset(x, 8, z), Blocks.SOUL_LANTERN.defaultBlockState());
-            }
-        }
-        for (int x = -5; x <= 5; x++) {
-            for (int z = 28; z <= 34; z++) {
-                if (Math.abs(x) + Math.abs(z - 31) <= 7) {
-                    set(level, origin.offset(x, 1, z), Blocks.GILDED_BLACKSTONE.defaultBlockState());
-                }
-            }
-        }
-        rubble(level, origin.offset(-14, 1, 31));
-        rubble(level, origin.offset(12, 1, 28));
-        fill(level, origin, -6, 6, 1, 1, 37, 38, Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState());
-        fill(level, origin, -5, 5, 2, 6, 39, 39, Blocks.IRON_BARS.defaultBlockState());
-
-        closeCheckpoint(level, session, 0);
-        closeCheckpoint(level, session, 1);
-        closeCheckpoint(level, session, 2);
-    }
-
-    private static void buildFallbackDungeon(ServerLevel level, DungeonSession session) {
-        BlockPos origin = session.arenaOrigin();
-        room(level, origin, -22, 22, -22, 22, 9, Blocks.POLISHED_BLACKSTONE_BRICKS.defaultBlockState(),
-                Blocks.POLISHED_DEEPSLATE.defaultBlockState(), Blocks.BLACKSTONE.defaultBlockState());
-        for (int x : new int[]{-18, 18}) {
-            for (int z : new int[]{-18, 18}) {
-                column(level, origin.offset(x, 1, z), 6, Blocks.CHISELED_POLISHED_BLACKSTONE.defaultBlockState());
-                lamp(level, origin.offset(x, 7, z));
-            }
-        }
+        return true;
     }
 
     public static BlockPos encounterCenter(DungeonSession session) {
-        if (!"abandoned_subway".equals(session.templateId())) return session.arenaOrigin().offset(0, 1, 0);
-        return switch (session.objectiveIndex()) {
-            case 0 -> session.arenaOrigin().offset(0, 1, -20);
-            case 1 -> session.arenaOrigin().offset(0, 1, 0);
-            case 2 -> session.arenaOrigin().offset(0, 1, 14);
-            case 3 -> bossCenter(session);
-            default -> rewardCenter(session);
-        };
+        Layout layout = layout(session);
+        int index = session.objectiveIndex();
+        BlockPos relative = index >= 0 && index < layout.objectiveCenters().size()
+                ? layout.objectiveCenters().get(index) : layout.reward();
+        return session.arenaOrigin().offset(relative);
     }
 
     public static BlockPos bossCenter(DungeonSession session) {
-        return "abandoned_subway".equals(session.templateId())
-                ? session.arenaOrigin().offset(0, 2, 31)
-                : session.arenaOrigin().offset(0, 1, 10);
+        return session.arenaOrigin().offset(layout(session).boss());
+    }
+
+    public static BlockPos rewardCenter(DungeonSession session) {
+        return session.arenaOrigin().offset(layout(session).reward());
+    }
+
+    public static BlockPos entryPoint(DungeonSession session) {
+        return session.arenaOrigin().offset(layout(session).entry());
+    }
+
+    public static int checkpointCount(DungeonSession session) {
+        return layout(session).checkpoints().size();
     }
 
     public static void openCheckpoint(ServerLevel level, DungeonSession session, int completedObjective) {
-        if (!"abandoned_subway".equals(session.templateId())) return;
-        BlockPos origin = session.arenaOrigin();
-        int z = switch (completedObjective) {
-            case 0 -> -10;
-            case 1 -> 7;
-            case 2 -> 20;
-            default -> Integer.MIN_VALUE;
-        };
-        if (z == Integer.MIN_VALUE) return;
-        carve(level, origin, -2, 2, 1, 4, z, z);
-        fill(level, origin, -3, -3, 1, 5, z, z, Blocks.POLISHED_BASALT.defaultBlockState());
-        fill(level, origin, 3, 3, 1, 5, z, z, Blocks.POLISHED_BASALT.defaultBlockState());
-    }
-
-    private static void closeCheckpoint(ServerLevel level, DungeonSession session, int objective) {
-        if (!"abandoned_subway".equals(session.templateId())) return;
-        int z = switch (objective) {
-            case 0 -> -10;
-            case 1 -> 7;
-            case 2 -> 20;
-            default -> 0;
-        };
-        fill(level, session.arenaOrigin(), -2, 2, 1, 4, z, z, Blocks.IRON_BARS.defaultBlockState());
+        Layout layout = layout(session);
+        if (completedObjective < 0 || completedObjective >= layout.checkpoints().size()) return;
+        layout.checkpoints().get(completedObjective).open(level, session.arenaOrigin());
     }
 
     public static void buildRewardRoom(ServerLevel level, DungeonSession session) {
-        BlockPos origin = session.arenaOrigin();
-        if ("abandoned_subway".equals(session.templateId())) {
-            room(level, origin, -6, 6, 40, 46, 6, Blocks.GILDED_BLACKSTONE.defaultBlockState(),
-                    Blocks.POLISHED_BLACKSTONE.defaultBlockState(), Blocks.BLACKSTONE.defaultBlockState());
-            carve(level, origin, -2, 2, 1, 4, 39, 40);
-            for (int x : new int[]{-4, 4}) lamp(level, origin.offset(x, 5, 43));
-            fill(level, origin, -2, 2, 1, 1, 44, 45, Blocks.GOLD_BLOCK.defaultBlockState());
-        } else {
-            room(level, origin, -5, 5, 13, 21, 6, Blocks.GILDED_BLACKSTONE.defaultBlockState(),
-                    Blocks.POLISHED_BLACKSTONE.defaultBlockState(), Blocks.BLACKSTONE.defaultBlockState());
-            carve(level, origin, -1, 1, 1, 3, 13, 13);
-        }
         BlockPos chestPos = rewardCenter(session);
         level.setBlock(chestPos, Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
         BlockEntity blockEntity = level.getBlockEntity(chestPos);
@@ -232,18 +159,6 @@ public final class DungeonArena {
             chest.setChanged();
         }
         session.setRewardRoomCreated(true);
-    }
-
-    public static BlockPos rewardCenter(DungeonSession session) {
-        return "abandoned_subway".equals(session.templateId())
-                ? session.arenaOrigin().offset(0, 1, 43)
-                : session.arenaOrigin().offset(0, 1, 18);
-    }
-
-    public static BlockPos entryPoint(DungeonSession session) {
-        return "abandoned_subway".equals(session.templateId())
-                ? session.arenaOrigin().offset(0, 1, -40)
-                : session.arenaOrigin().offset(0, 1, -15);
     }
 
     public static BlockPos findSafePlayerPosition(ServerLevel level, BlockPos preferred, int radius) {
@@ -278,12 +193,21 @@ public final class DungeonArena {
     }
 
     public static void clear(ServerLevel level, DungeonSession session) {
-        BlockPos origin = session.arenaOrigin();
-        if ("abandoned_subway".equals(session.templateId())) {
-            clearBox(level, origin, -19, 19, -1, 12, -45, 47);
-        } else {
-            clearBox(level, origin, -24, 24, -1, 12, -24, 24);
+        if (session.arenaOrigin().getY() > 0) {
+            clearLegacyArena(level, session);
+            return;
         }
+        loadArenaChunks(level, session);
+        Layout layout = LAYOUTS.get(session.templateId());
+        restoreUndergroundVolume(level, session,
+                layout == null ? Blocks.DEEPSLATE.defaultBlockState() : layout.shell());
+        session.setArenaBuilt(false);
+    }
+
+    public static void clearLegacyArena(ServerLevel level, DungeonSession session) {
+        if (session.arenaOrigin().getY() <= 0) return;
+        loadArenaChunks(level, session);
+        fill(level, session.arenaOrigin(), -48, 48, -2, 20, -48, 48, Blocks.AIR.defaultBlockState());
         session.setArenaBuilt(false);
     }
 
@@ -330,77 +254,16 @@ public final class DungeonArena {
         session.setLiveEnemyCount(0);
     }
 
-    private static void room(ServerLevel level, BlockPos origin, int minX, int maxX, int minZ, int maxZ, int height,
-                             BlockState wall, BlockState floor, BlockState ceiling) {
-        fill(level, origin, minX, maxX, 0, 0, minZ, maxZ, floor);
-        fill(level, origin, minX, maxX, height, height, minZ, maxZ, ceiling);
-        fill(level, origin, minX, minX, 1, height - 1, minZ, maxZ, wall);
-        fill(level, origin, maxX, maxX, 1, height - 1, minZ, maxZ, wall);
-        fill(level, origin, minX, maxX, 1, height - 1, minZ, minZ, wall);
-        fill(level, origin, minX, maxX, 1, height - 1, maxZ, maxZ, wall);
-        carve(level, origin, minX + 1, maxX - 1, 1, height - 1, minZ + 1, maxZ - 1);
+    private static void restoreUndergroundVolume(ServerLevel level, DungeonSession session, BlockState shell) {
+        fill(level, session.arenaOrigin(), SHELL_MIN_X, SHELL_MAX_X, SHELL_MIN_Y, SHELL_MAX_Y,
+                SHELL_MIN_Z, SHELL_MAX_Z, shell);
     }
 
-    private static void tunnel(ServerLevel level, BlockPos origin, int minX, int maxX, int minZ, int maxZ, int height,
-                               BlockState wall, BlockState floor, BlockState ceiling) {
-        room(level, origin, minX, maxX, minZ, maxZ, height, wall, floor, ceiling);
-        carve(level, origin, minX + 1, maxX - 1, 1, Math.min(4, height - 1), minZ, minZ);
-        carve(level, origin, minX + 1, maxX - 1, 1, Math.min(4, height - 1), maxZ, maxZ);
-    }
-
-    private static void doorway(ServerLevel level, BlockPos origin, int z, int halfWidth, int height) {
-        carve(level, origin, -halfWidth, halfWidth, 1, height, z, z);
-    }
-
-    private static void ticketBooth(ServerLevel level, BlockPos base) {
-        fillAbsolute(level, base, 0, 2, 0, 0, 0, 2, Blocks.POLISHED_ANDESITE.defaultBlockState());
-        fillAbsolute(level, base, 0, 2, 1, 2, 0, 0, Blocks.IRON_BARS.defaultBlockState());
-        fillAbsolute(level, base, 0, 2, 3, 3, 0, 2, Blocks.DEEPSLATE_TILE_SLAB.defaultBlockState());
-    }
-
-    private static void bench(ServerLevel level, BlockPos base) {
-        set(level, base, Blocks.DARK_OAK_SLAB.defaultBlockState());
-        set(level, base.offset(1, 0, 0), Blocks.DARK_OAK_SLAB.defaultBlockState());
-        set(level, base.offset(2, 0, 0), Blocks.DARK_OAK_SLAB.defaultBlockState());
-        set(level, base.offset(0, -1, 0), Blocks.DARK_OAK_FENCE.defaultBlockState());
-        set(level, base.offset(2, -1, 0), Blocks.DARK_OAK_FENCE.defaultBlockState());
-    }
-
-    private static void rubble(ServerLevel level, BlockPos base) {
-        set(level, base, Blocks.COBBLESTONE.defaultBlockState());
-        set(level, base.offset(1, 0, 0), Blocks.MOSSY_COBBLESTONE.defaultBlockState());
-        set(level, base.offset(0, 0, 1), Blocks.GRAVEL.defaultBlockState());
-        set(level, base.offset(1, 1, 1), Blocks.COBBLESTONE_SLAB.defaultBlockState());
-    }
-
-    private static void lamp(ServerLevel level, BlockPos pos) {
-        set(level, pos, Blocks.SEA_LANTERN.defaultBlockState());
-    }
-
-    private static void column(ServerLevel level, BlockPos base, int height, BlockState state) {
-        for (int y = 0; y < height; y++) set(level, base.offset(0, y, 0), state);
-    }
-
-    private static void carve(ServerLevel level, BlockPos origin, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
-        fill(level, origin, minX, maxX, minY, maxY, minZ, maxZ, Blocks.AIR.defaultBlockState());
-    }
-
-    private static void clearBox(ServerLevel level, BlockPos origin, int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
-        fill(level, origin, minX, maxX, minY, maxY, minZ, maxZ, Blocks.AIR.defaultBlockState());
-    }
-
-    private static void fill(ServerLevel level, BlockPos origin, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, BlockState state) {
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) set(level, origin.offset(x, y, z), state);
-            }
-        }
-    }
-
-    private static void fillAbsolute(ServerLevel level, BlockPos base, int minX, int maxX, int minY, int maxY, int minZ, int maxZ, BlockState state) {
-        for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) set(level, base.offset(x, y, z), state);
+    private static void fill(ServerLevel level, BlockPos origin, int minX, int maxX, int minY, int maxY,
+                             int minZ, int maxZ, BlockState state) {
+        for (int y = minY; y <= maxY; y++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int x = minX; x <= maxX; x++) set(level, origin.offset(x, y, z), state);
             }
         }
     }
@@ -411,12 +274,49 @@ public final class DungeonArena {
 
     private static void loadArenaChunks(ServerLevel level, DungeonSession session) {
         BlockPos origin = session.arenaOrigin();
-        int minChunkX = (origin.getX() - RADIUS - 2) >> 4;
-        int maxChunkX = (origin.getX() + RADIUS + 2) >> 4;
-        int minChunkZ = (origin.getZ() - RADIUS - 2) >> 4;
-        int maxChunkZ = (origin.getZ() + RADIUS + 2) >> 4;
+        int minChunkX = (origin.getX() - RADIUS) >> 4;
+        int maxChunkX = (origin.getX() + RADIUS) >> 4;
+        int minChunkZ = (origin.getZ() - RADIUS) >> 4;
+        int maxChunkZ = (origin.getZ() + RADIUS) >> 4;
         for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
             for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) level.getChunk(chunkX, chunkZ);
+        }
+    }
+
+    private static ResourceLocation structure(String id) {
+        return new ResourceLocation(SoloLevelingMod.MODID, "dungeons/" + id);
+    }
+
+    private static BlockPos offset(int x, int y, int z) {
+        return new BlockPos(x, y, z);
+    }
+
+    private static Layout layout(DungeonSession session) {
+        Layout layout = LAYOUTS.get(session.templateId());
+        if (layout == null) throw new IllegalStateException("No dungeon layout for " + session.templateId());
+        return layout;
+    }
+
+    private record Layout(ResourceLocation structureId, BlockState shell, BlockPos entry,
+                          List<BlockPos> objectiveCenters, BlockPos boss, BlockPos reward,
+                          List<Doorway> checkpoints) {}
+
+    private record Doorway(int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
+                           BlockState barrier) {
+        private static Doorway xPlane(int x, int minY, int maxY, int minZ, int maxZ, BlockState barrier) {
+            return new Doorway(x, x, minY, maxY, minZ, maxZ, barrier);
+        }
+
+        private static Doorway zPlane(int z, int minY, int maxY, int minX, int maxX, BlockState barrier) {
+            return new Doorway(minX, maxX, minY, maxY, z, z, barrier);
+        }
+
+        private void close(ServerLevel level, BlockPos origin) {
+            fill(level, origin, minX, maxX, minY, maxY, minZ, maxZ, barrier);
+        }
+
+        private void open(ServerLevel level, BlockPos origin) {
+            fill(level, origin, minX, maxX, minY, maxY, minZ, maxZ, Blocks.AIR.defaultBlockState());
         }
     }
 

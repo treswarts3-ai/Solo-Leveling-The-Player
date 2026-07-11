@@ -45,7 +45,7 @@ public final class DungeonContent {
                 wave("mid_elite", false, spawn("shadow_commander", 1), spawn("shadow_goblin", 3))
         );
         template(new DungeonTypes.DungeonTemplate(
-                "red_orc_outpost", "Red Orc Outpost", DungeonTypes.GateRank.B, 20 * 60 * 16,
+                "red_orc_outpost", "Red Orc Stronghold", DungeonTypes.GateRank.B, 20 * 60 * 16,
                 List.of(
                         objective(DungeonTypes.ObjectiveType.WAVE, "break_outer_guard", "mid_wave_1", 13, 20 * 60 * 5, "Break the outer guard"),
                         objective(DungeonTypes.ObjectiveType.COLLECTION, "recover_essence_stones", "mid_collection_wave", 8, 20 * 60 * 5, "Recover eight essence stones"),
@@ -68,6 +68,23 @@ public final class DungeonContent {
                         objective(DungeonTypes.ObjectiveType.BOSS, "defeat_iron_sovereign", "iron_sovereign", 1, 20 * 60 * 6, "Defeat the Iron Sovereign"),
                         objective(DungeonTypes.ObjectiveType.REWARD, "claim_high_reward", "reward_room", 1, 20 * 60, "Enter the sovereign vault")
                 ), highWaves, reward(6000, 2600, item("minecraft:netherite_scrap", 2), item("minecraft:diamond", 5), item("minecraft:echo_shard", 3))
+        ));
+
+        Map<String, DungeonTypes.WaveDefinition> templeWaves = waves(
+                wave("temple_gallery", false, spawn("stone_guardian", 3), spawn("shadow_archer", 5)),
+                wave("temple_trials", true, spawn("shadow_guardian", 3), spawn("shadow_archer", 4), spawn("shadow_raider", 3)),
+                wave("temple_judges", false, spawn("shadow_commander", 2), spawn("stone_guardian", 2))
+        );
+        template(new DungeonTypes.DungeonTemplate(
+                "cartenon_temple", "Cartenon Temple", DungeonTypes.GateRank.S, 20 * 60 * 24,
+                List.of(
+                        objective(DungeonTypes.ObjectiveType.WAVE, "survive_statue_gallery", "temple_gallery", 8, 20 * 60 * 6, "Survive the statue gallery"),
+                        objective(DungeonTypes.ObjectiveType.COLLECTION, "complete_temple_trials", "temple_trials", 8, 20 * 60 * 5, "Recover eight runes of obedience"),
+                        objective(DungeonTypes.ObjectiveType.ELITE, "defeat_temple_judges", "temple_judges", 4, 20 * 60 * 5, "Defeat the temple judges"),
+                        objective(DungeonTypes.ObjectiveType.BOSS, "defeat_architect_idol", "architect_idol", 1, 20 * 60 * 7, "Defeat the Architect's Idol"),
+                        objective(DungeonTypes.ObjectiveType.REWARD, "claim_temple_relic", "reward_room", 1, 20 * 60, "Enter the hidden reliquary")
+                ), templeWaves, reward(10000, 5000, item("minecraft:netherite_scrap", 4),
+                        item("minecraft:diamond", 8), item("minecraft:echo_shard", 6), item("minecraft:totem_of_undying", 1))
         ));
     }
 

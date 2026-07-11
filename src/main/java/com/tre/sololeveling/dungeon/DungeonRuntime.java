@@ -34,10 +34,17 @@ public final class DungeonRuntime {
         public static Result fail(String message) { return new Result(false, message); }
     }
 
-    public static final int ARENA_LAYOUT_VERSION = 2;
+    public static final int ARENA_LAYOUT_VERSION = 3;
 
     private static final Map<UUID, Integer> MISSING_BOSS_TICKS = new HashMap<>();
     private static final String PLAYER_RETURN_TAG = "sl_dungeon_return";
+
+    public static Result createTemplateGate(ServerPlayer creator, String templateId) {
+        DungeonTypes.DungeonTemplate template = DungeonContent.template(templateId);
+        if (template == null) return Result.fail("Unknown dungeon template: " + templateId);
+        String gateId = template.id() + "_" + Long.toString(creator.level().getGameTime(), 36);
+        return createGate(creator, gateId, template.rank(), template.id());
+    }
 
     public static Result createGate(ServerPlayer creator, String rawId, DungeonTypes.GateRank rank, String templateId) {
         String gateId = DungeonTypes.id(rawId);
@@ -101,7 +108,9 @@ public final class DungeonRuntime {
         ServerLevel dungeonLevel = server.overworld();
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(slot));
         session.setLastActiveGameTime(dungeonLevel.getGameTime());
-        DungeonArena.build(dungeonLevel, session);
+        if (!DungeonArena.build(dungeonLevel, session)) {
+            return Result.fail("Dungeon structure template could not be loaded");
+        }
         session.setArenaVersion(ARENA_LAYOUT_VERSION);
         BlockPos entry = DungeonArena.findSafePlayerPosition(dungeonLevel, DungeonArena.entryPoint(session), 6);
         if (entry == null) {
@@ -200,7 +209,12 @@ public final class DungeonRuntime {
             return false;
         }
         DungeonArena.discardSessionEntities(level, session);
-        DungeonArena.build(level, session);
+        DungeonArena.clearLegacyArena(level, session);
+        session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(session.arenaSlot()));
+        if (!DungeonArena.build(level, session)) {
+            fail(server, session, "Dungeon structure template could not be recovered");
+            return false;
+        }
         session.setArenaVersion(ARENA_LAYOUT_VERSION);
         BlockPos entry = DungeonArena.findSafePlayerPosition(level, DungeonArena.entryPoint(session), 6);
         if (entry == null) {
