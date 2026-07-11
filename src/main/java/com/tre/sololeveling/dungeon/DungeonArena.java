@@ -294,7 +294,28 @@ public final class DungeonArena {
     }
 
     public static List<String> validate(ServerLevel level, DungeonSession session) {
+        if (session.state() == DungeonTypes.SessionState.BUILDING) {
+            clearObjectiveMarkerObstructions(level, session);
+        }
         return MasterDungeonBuilder.validate(level, session.arenaOrigin());
+    }
+
+    /**
+     * Decorations are authored after room carving, so a statue, altar, or rubble pile can
+     * overlap a required encounter marker. Clear a small standing volume only during the
+     * post-build validation step; later manual validation cannot erase reward containers.
+     */
+    private static void clearObjectiveMarkerObstructions(ServerLevel level, DungeonSession session) {
+        for (BlockPos relative : MasterDungeonBuilder.objectiveCenters()) {
+            BlockPos center = session.arenaOrigin().offset(relative);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    for (int dy = 0; dy <= 2; dy++) {
+                        set(level, center.offset(dx, dy, dz), Blocks.AIR.defaultBlockState());
+                    }
+                }
+            }
+        }
     }
 
     public static BlockPos regionPoint(DungeonSession session, String region) {
