@@ -6,7 +6,7 @@ Dungeon state is server-authoritative and persisted in overworld `SavedData` und
 
 ## Normal player flow
 
-1. An operator creates a gate with `/sl dungeon create_gate <gate_id> <rank> <template>`.
+1. An operator creates a correctly ranked gate with `/sl dungeon open <template>`. The longer recovery form remains `/sl dungeon create_gate <gate_id> <rank> <template>`.
 2. A crying-obsidian frame is filled with a luminous blue animated, non-solid `gate_portal` surface.
 3. The player walks through the surface.
 4. The server checks the saved gate, level requirement, access hooks, proximity, duplicate-session state, and available arena capacity.
@@ -33,34 +33,18 @@ Dungeon state is server-authoritative and persisted in overworld `SavedData` und
 
 | ID | Rank | Content |
 |---|---:|---|
-| `abandoned_subway` | E | Authored station route, platform wave, mana-crystal recovery, security elite, Subway Warden, reward vault |
-| `red_orc_outpost` | B | Reusable fallback arena, mixed wave, essence collection, commander elite, reward room |
-| `demon_castle_foyer` | A | Reusable fallback arena, vanguard wave, core collection, twin commanders, Iron Sovereign, reward room |
+| `abandoned_subway` | E | Ticket hall, full platform and train, maintenance plant, security wing, Subway Warden terminal, gold-lined vault |
+| `red_orc_outpost` | B | Subterranean stronghold, war yard, barracks, infernal forge, command hall, captured treasure vault |
+| `demon_castle_foyer` | A | Obsidian arrival bridge, infernal nave, demon forge, chapel, Iron Sovereign throne room, sovereign vault |
+| `cartenon_temple` | S | Commandment hall, sixteen-idol statue gallery, trial chamber, judgment chapel, Architect's Idol, hidden reliquary |
 
-## Abandoned Subway route
+## Authored underground maps
 
-The E-rank route is generated in this order:
+All four maps are deterministic vanilla Java structure templates stored under `data/sololeveling/structures/dungeons`. Each template is 89 by 19 by 89 blocks and is placed at Y -32 inside a bounded 93 by 25 by 93 solid stone volume. The two-block side and floor buffer plus four-block roof buffer prevent exposed sky, terrain caves, water, or random holes from reaching the playable map.
 
-1. Entrance vestibule and station marker
-2. Ticket hall with booths and turnstiles
-3. Platform encounter
-4. Maintenance machinery and pipe area
-5. Security room and elite checkpoint
-6. Subway Warden boss chamber
-7. Sealed reward vault
+The templates contain hand-positioned rooms, corridors, arches, landmark silhouettes, navigation accents, lighting, cover, props, and reward spaces. They do not use random jigsaw selection. Runtime metadata supplies a unique entry, encounter center, boss center, reward center, and three or four objective doors for each map.
 
-Every room-to-corridor seam is explicitly carved after room generation. This avoids the previous failure mode where independently generated room walls blocked the intended route.
-
-Environmental details include:
-
-- raised platform edges and yellow safety strips
-- recessed gravel track bed and rails
-- station columns, benches, ticket booths, and a lit station marker
-- cracked masonry, rubble piles, broken lamps, and a water-leak feature
-- copper machinery, exposed pipes, work surfaces, barrels, and anvils
-- barred security staging and colored room markers
-- a raised gilded boss dais, soul lighting, pillars, and side rubble
-- a gold-lined reward vault with a presentation chest
+The generator at `tools/generate_dungeon_structures.py` validates every template before writing NBT. Validation performs a three-dimensional walkability search from the entry, checks every encounter and checkpoint, rejects routes that touch the outer shell, and reports block/detail counts. This directly guards against the former sealed-seam and exposed-void failure modes.
 
 Arena placement is bounded to the authored footprint and uses client-update block flags instead of full neighbor updates for every block. Existing identical states are skipped.
 
@@ -133,7 +117,7 @@ Safety behavior:
 - Waiting sessions expire after five minutes without a member in the arena.
 - Active sessions fail after one minute without a member in the arena.
 - Completed sessions clean up after 20 seconds; failed sessions clean up after five seconds.
-- Cleanup queries only the session arena, discards session-tagged entities, clears the authored footprint, removes the boss bar, and deletes the saved session.
+- Cleanup queries only the session arena, discards session-tagged entities, restores the bounded underground volume to solid stone, removes the boss bar, and deletes the saved session.
 
 ## Commands
 
@@ -141,6 +125,7 @@ Both `/sl dungeon` and `/sololeveling dungeon` expose the same commands.
 
 | Command | Permission | Purpose |
 |---|---:|---|
+| `open <template>` | 2 | Create a correctly ranked gate for one of the four maps in front of the player |
 | `create_gate <gate_id> <rank> <template>` | 2 | Create a persistent interactive gate |
 | `remove_gate <gate_id>` | 2 | Remove a gate and every recognized marker block |
 | `enter_gate <gate_id>` | Player | Manual solo recovery/test entry |
@@ -175,6 +160,8 @@ Dungeon enemies carry session, enemy-ID, dungeon-enemy, and shadow-extractable t
 - Maximum 64 live dungeon enemies per session
 - Maximum 160 total wave spawns per session
 - Maximum 4,096 reserved arena slots
+- Each arena is isolated by 104 blocks and bounded to a 48-block radius
+- Each structure template is exactly 89 by 19 by 89 blocks
 - Bounded arena entity queries; no full-world entity scan
 - Collection scans limited to the arena every four ticks
 - Gate animation skips unloaded chunks
@@ -187,4 +174,4 @@ The required build command is:
 ./gradlew clean build --stacktrace --no-daemon
 ```
 
-A successful Forge build proves source/resource compatibility, not gameplay behavior. Hands-on Minecraft testing is still required for portal appearance, full physical traversal, perceived difficulty, multiplayer movement, death/reconnect timing, and visual cleanup. Red Orc Outpost and Demon Castle still use the fallback arena and are outside this workstream.
+A successful Forge build proves source/resource compatibility. The generator additionally proves template dimensions, NBT generation, route connectivity, marker reachability, and sealed boundaries. Perceived combat balance and presentation still benefit from normal release playtesting, but no map depends on the removed fallback arena.

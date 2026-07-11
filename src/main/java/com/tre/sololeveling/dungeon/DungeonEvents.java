@@ -47,6 +47,12 @@ public final class DungeonEvents {
 
     private static LiteralArgumentBuilder<CommandSourceStack> dungeonCommands() {
         return Commands.literal("dungeon")
+                .then(Commands.literal("open").requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("template", StringArgumentType.word())
+                                .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
+                                .executes(context -> send(context.getSource(), DungeonRuntime.createTemplateGate(
+                                        context.getSource().getPlayerOrException(),
+                                        StringArgumentType.getString(context, "template"))))))
                 .then(Commands.literal("create_gate").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("gate_id", StringArgumentType.word())
                                 .then(Commands.argument("rank", StringArgumentType.word())
@@ -185,7 +191,7 @@ public final class DungeonEvents {
             if (session.isTerminal() || !session.arenaBuilt()) continue;
             ServerLevel level = server.getLevel(session.dungeonDimension());
             if (level == null) continue;
-            int opened = Math.min(3, session.objectiveIndex());
+            int opened = Math.min(DungeonArena.checkpointCount(session), session.objectiveIndex());
             for (int objective = 0; objective < opened; objective++) {
                 DungeonArena.openCheckpoint(level, session, objective);
             }

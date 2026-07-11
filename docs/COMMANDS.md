@@ -24,3 +24,4 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl shadow capacity add <player> <amount>` | Increase storage capacity |
 | `/sl giveall <player>` | Grant all registered mod items |
 | `/sl sync <player>` | Force an owner-data sync |
+| `/sl dungeon open <abandoned_subway\|red_orc_outpost\|demon_castle_foyer\|cartenon_temple>` | Spawn a correctly ranked portal for one of the four authored dungeon maps |
