@@ -27,20 +27,28 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
 
-      - name: Apply reviewed UI overhaul payload
+      - name: Extract reviewed UI overhaul payload
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/ui-overhaul') || (github.event_name == 'pull_request' && github.head_ref == 'feature/ui-overhaul')
+        shell: bash
+        run: python tools/apply_ui_overhaul.py
+
+      - name: Stage final UI overhaul commit
         if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/ui-overhaul') || (github.event_name == 'pull_request' && github.head_ref == 'feature/ui-overhaul')
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "solo-leveling-ui-worker"
           git config user.email "ui-worker@users.noreply.github.com"
-          python tools/apply_ui_overhaul.py
           git checkout HEAD -- .github/workflows/build.yml .github/workflows/apply-ui-overhaul.yml
           git rm -r tools/ui_patch tools/apply_ui_overhaul.py
           git add -A
           git diff --cached --check
           git commit -m "Overhaul System UI and HUD"
-          git push origin HEAD:feature/ui-overhaul
+
+      - name: Publish final UI overhaul commit
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/ui-overhaul') || (github.event_name == 'pull_request' && github.head_ref == 'feature/ui-overhaul')
+        shell: bash
+        run: git push origin HEAD:feature/ui-overhaul
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
