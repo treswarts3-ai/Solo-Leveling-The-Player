@@ -32,10 +32,8 @@ jobs:
         if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/ui-overhaul') || (github.event_name == 'pull_request' && github.head_ref == 'feature/ui-overhaul')
         shell: bash
         run: |
-          set -euxo pipefail
-          python --version
-          wc -c tools/ui_patch/part*
-          python tools/apply_ui_overhaul.py
+          set -euo pipefail
+          cat tools/ui_patch/part* | base64 --decode | xz --decompress | tar --extract --file -
 
       - name: Stage final UI overhaul commit
         if: (github.event_name == 'push' && github.ref == 'refs/heads/feature/ui-overhaul') || (github.event_name == 'pull_request' && github.head_ref == 'feature/ui-overhaul')
