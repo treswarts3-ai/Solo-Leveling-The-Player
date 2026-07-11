@@ -32,28 +32,31 @@ The compiled mod is produced in `build/libs/`.
 
 - Persistent, server-authoritative Hunter data
 - Hunter XP, levels, stats, mana, gold, ranks, jobs, titles, and skill unlocks
-- Status, Skills, Quests, Store, Shadows, and System Inventory interfaces
+- Unified Player, Stats, Abilities, Inventory, Equipment, Quests, Shop, Dungeons, Shadows, and Settings interfaces
+- Configurable responsive HUD with six ability slots, cooldowns, quest tracking, opacity, scaling, anchoring, offsets, compact mode, and minimal mode
 - Daily exercises, penalty flow, tutorial, Job Change, Shadow Mastery, Black Heart, and emergency progression
-- Stealth, Bloodlust, Quicksilver, Mutilation, Dagger Rush, Ruler's Authority, and Dragon's Fear
+- Stealth, Bloodlust, Quicksilver, Mutilation, Dagger Rush, Ruler's Authority, Dragon's Fear, and every registered active ability
 - Shadow extraction, storage, summon, dismissal, AI modes, Shadow Exchange, and Monarch's Domain
-- Persistent gates and dungeon sessions with objectives, timers, recovery, rewards, enemies, elites, and boss encounters
+- Persistent gates and four authored underground dungeon maps with objectives, timers, recovery, rewards, enemies, elites, and bosses
 - Signature weapons, armor, accessories, equipment sets, runes, keys, potions, materials, and story items
-- Original generated PNG textures, editable HTML pixel-art sources, particles, and OGG sounds
+- Original generated PNG textures, editable HTML pixel-art sources, particles, OGG sounds, and original System UI icon assets
 
 ## Controls
 
 | Action | Default key |
 |---|---|
-| Open System | M |
-| Primary ability | R |
-| Secondary ability | V |
+| Open or close the System | M |
+| Open Shadow tab | B |
+| Toggle System HUD | H |
+| Dash | Left Alt |
+| Mutilation | R |
+| Dagger Rush | V |
 | Shadow Extraction | G |
-| Shadow menu | B |
 | Shadow Exchange | X |
 | Quicksilver | Z |
 | Ruler's Authority | C |
-| Toggle HUD | H |
-| Dodge | Left Alt |
+
+All implemented abilities appear under **Options > Controls > Solo Leveling**. Unassigned abilities can be bound there. The System's Abilities tab shows current keys, conflicts, cooldowns, requirements, and six configurable HUD slots.
 
 ## Development workflow
 
@@ -68,8 +71,10 @@ This repository is structured for parallel development through isolated feature 
 
 ## Documentation
 
+- [System UI overhaul](docs/UI_OVERHAUL.md)
 - [Commands](docs/COMMANDS.md)
 - [Controls](docs/CONTROLS.md)
+- [Dungeons](docs/DUNGEONS.md)
 - [Balancing](docs/BALANCING.md)
 - [Asset manifest](docs/ASSET_MANIFEST.md)
 - [Research notes](docs/RESEARCH.md)
@@ -78,4 +83,4 @@ This repository is structured for parallel development through isolated feature 
 
 ## Release status
 
-Version 1.0.0 is a compiled development prerelease. Automated Forge builds pass, but gameplay balance, long-session persistence, dedicated-server runtime behavior, multiplayer stress, and visual polish still require hands-on testing.
+Version 1.0.0 is a compiled development prerelease. Automated Forge builds pass, but gameplay balance, long-session persistence, dedicated-server runtime behavior, multiplayer stress, and final visual acceptance still require hands-on testing.

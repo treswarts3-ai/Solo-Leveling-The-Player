@@ -46,6 +46,10 @@ jobs:
             cmp "$file" "/tmp/solo-leveling-dungeons/${file##*/}"
           done
 
+      - name: Validate System UI assets
+        shell: bash
+        run: python tools/validate_ui_assets.py
+
       - name: Build Forge mod
         shell: bash
         run: |
