@@ -45,6 +45,8 @@ public final class MasterDungeonBuilder {
     public static final int LOOP_COUNT = 6;
     public static final int SHORTCUT_COUNT = 3;
     public static final int SECRET_COUNT = 7;
+    public static final int MAX_BLOCK_VISITS_PER_TICK = 16_384;
+    public static final int MAX_BLOCK_CHANGES_PER_TICK = 4_096;
 
     private static final int UPDATE_FLAGS = Block.UPDATE_CLIENTS;
     private static final BlockState AIR = Blocks.AIR.defaultBlockState();
@@ -222,23 +224,46 @@ public final class MasterDungeonBuilder {
             Map.entry("reward", pos(54, -9, 136))
     );
 
-    public static BuildReport build(ServerLevel level, BlockPos origin) {
-        Editor editor = new Editor(level, origin);
+    public static BuildJob buildJob(BlockPos origin) {
+        Editor editor = new Editor(origin);
         for (Room room : ROOMS) editor.room(room);
         for (Link link : LINKS) editor.link(link);
         decorate(editor);
-        return new BuildReport(editor.changed, editor.visited, validate(level, origin).isEmpty());
+        return new BuildJob("build", editor.operations);
     }
 
-    public static int clear(ServerLevel level, BlockPos origin) {
-        Editor editor = new Editor(level, origin);
+    public static BuildJob clearJob(BlockPos origin) {
+        Editor editor = new Editor(origin);
+        appendClearOperations(editor);
+        return new BuildJob("clear", editor.operations);
+    }
+
+    public static BuildJob rebuildJob(BlockPos origin) {
+        Editor editor = new Editor(origin);
+        appendClearOperations(editor);
+        for (Room room : ROOMS) editor.room(room);
+        for (Link link : LINKS) editor.link(link);
+        decorate(editor);
+        return new BuildJob("rebuild", editor.operations);
+    }
+
+    public static BuildJob legacyMigrationJob(BlockPos oldOrigin, BlockPos newOrigin) {
+        Editor editor = new Editor(oldOrigin);
+        editor.fill(-48, 48, -2, 20, -48, 48, AIR);
+        editor = new Editor(newOrigin, editor.operations);
+        for (Room room : ROOMS) editor.room(room);
+        for (Link link : LINKS) editor.link(link);
+        decorate(editor);
+        return new BuildJob("migration", editor.operations);
+    }
+
+    private static void appendClearOperations(Editor editor) {
         for (Room room : ROOMS) {
             editor.fill(room.minX - SHELL_THICKNESS, room.maxX + SHELL_THICKNESS,
                     room.floorY - SHELL_THICKNESS, room.ceilingY() + SHELL_THICKNESS,
                     room.minZ - SHELL_THICKNESS, room.maxZ + SHELL_THICKNESS, RESTORE);
         }
         for (Link link : LINKS) editor.clearLinkEnvelope(link);
-        return editor.changed;
     }
 
     public static AABB bounds(BlockPos origin) {
@@ -466,7 +491,136 @@ public final class MasterDungeonBuilder {
 
     private static BlockPos pos(int x, int y, int z) { return new BlockPos(x, y, z); }
 
-    public record BuildReport(int changedBlocks, int visitedBlocks, boolean valid) {}
+    public record TickReport(int visitedBlocks, int changedBlocks, boolean complete) {}
+
+    public record JobReport(String mode, long plannedVisits, long visitedBlocks, long changedBlocks,
+                            int elapsedTicks, int maxVisitedInTick, int maxChangedInTick) {
+        public double progress() {
+            return plannedVisits <= 0L ? 1.0D : Math.min(1.0D, visitedBlocks / (double)plannedVisits);
+        }
+    }
+
+    public static final class BuildJob {
+        private final String mode;
+        private final List<BoxOperation> operations;
+        private final long plannedVisits;
+        private int operationIndex;
+        private long visited;
+        private long changed;
+        private int elapsedTicks;
+        private int maxVisitedInTick;
+        private int maxChangedInTick;
+
+        private BuildJob(String mode, List<BoxOperation> operations) {
+            this.mode = mode;
+            this.operations = List.copyOf(operations);
+            this.plannedVisits = this.operations.stream().mapToLong(BoxOperation::volume).sum();
+        }
+
+        public TickReport tick(ServerLevel level) {
+            if (complete()) return new TickReport(0, 0, true);
+            int visitedThisTick = 0;
+            int changedThisTick = 0;
+            while (operationIndex < operations.size()
+                    && visitedThisTick < MAX_BLOCK_VISITS_PER_TICK
+                    && changedThisTick < MAX_BLOCK_CHANGES_PER_TICK) {
+                BoxOperation operation = operations.get(operationIndex);
+                OperationStep step = operation.apply(level,
+                        MAX_BLOCK_VISITS_PER_TICK - visitedThisTick,
+                        MAX_BLOCK_CHANGES_PER_TICK - changedThisTick);
+                visitedThisTick += step.visitedBlocks();
+                changedThisTick += step.changedBlocks();
+                if (step.complete()) operationIndex++;
+                if (step.visitedBlocks() == 0 && !step.complete()) break;
+            }
+            visited += visitedThisTick;
+            changed += changedThisTick;
+            elapsedTicks++;
+            maxVisitedInTick = Math.max(maxVisitedInTick, visitedThisTick);
+            maxChangedInTick = Math.max(maxChangedInTick, changedThisTick);
+            return new TickReport(visitedThisTick, changedThisTick, complete());
+        }
+
+        public boolean complete() { return operationIndex >= operations.size(); }
+        public String mode() { return mode; }
+        public long plannedVisits() { return plannedVisits; }
+        public long visitedBlocks() { return visited; }
+        public long changedBlocks() { return changed; }
+        public int elapsedTicks() { return elapsedTicks; }
+        public double progress() { return plannedVisits <= 0L ? 1.0D : Math.min(1.0D, visited / (double)plannedVisits); }
+        public JobReport report() {
+            return new JobReport(mode, plannedVisits, visited, changed, elapsedTicks,
+                    maxVisitedInTick, maxChangedInTick);
+        }
+    }
+
+    private record OperationStep(int visitedBlocks, int changedBlocks, boolean complete) {}
+
+    private static final class BoxOperation {
+        private final int minX;
+        private final int maxX;
+        private final int minY;
+        private final int maxY;
+        private final int minZ;
+        private final int maxZ;
+        private final BlockState state;
+        private int x;
+        private int y;
+        private int z;
+        private boolean complete;
+
+        private BoxOperation(BlockPos origin, int minX, int maxX, int minY, int maxY,
+                             int minZ, int maxZ, BlockState state) {
+            this.minX = origin.getX() + Math.min(minX, maxX);
+            this.maxX = origin.getX() + Math.max(minX, maxX);
+            this.minY = origin.getY() + Math.min(minY, maxY);
+            this.maxY = origin.getY() + Math.max(minY, maxY);
+            this.minZ = origin.getZ() + Math.min(minZ, maxZ);
+            this.maxZ = origin.getZ() + Math.max(minZ, maxZ);
+            this.state = state;
+            this.x = this.minX;
+            this.y = this.minY;
+            this.z = this.minZ;
+        }
+
+        private long volume() {
+            return (long)(maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
+        }
+
+        private OperationStep apply(ServerLevel level, int visitBudget, int changeBudget) {
+            if (complete || visitBudget <= 0 || changeBudget <= 0) {
+                return new OperationStep(0, 0, complete);
+            }
+            int visited = 0;
+            int changed = 0;
+            BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+            while (!complete && visited < visitBudget && changed < changeBudget) {
+                cursor.set(x, y, z);
+                visited++;
+                if (!level.getBlockState(cursor).equals(state)) {
+                    level.setBlock(cursor, state, UPDATE_FLAGS);
+                    changed++;
+                }
+                advance();
+            }
+            return new OperationStep(visited, changed, complete);
+        }
+
+        private void advance() {
+            if (x < maxX) {
+                x++;
+            } else if (z < maxZ) {
+                x = minX;
+                z++;
+            } else if (y < maxY) {
+                x = minX;
+                z = minZ;
+                y++;
+            } else {
+                complete = true;
+            }
+        }
+    }
 
     private enum Corridor { GRAND, RUINED, SERVICE }
 
@@ -499,14 +653,16 @@ public final class MasterDungeonBuilder {
     }
 
     private static final class Editor {
-        private final ServerLevel level;
         private final BlockPos origin;
-        private int changed;
-        private int visited;
+        private final List<BoxOperation> operations;
 
-        private Editor(ServerLevel level, BlockPos origin) {
-            this.level = level;
-            this.origin = origin;
+        private Editor(BlockPos origin) {
+            this(origin, new ArrayList<>());
+        }
+
+        private Editor(BlockPos origin, List<BoxOperation> operations) {
+            this.origin = origin.immutable();
+            this.operations = operations;
         }
 
         private void room(Room room) {
@@ -650,20 +806,11 @@ public final class MasterDungeonBuilder {
         }
 
         private void fill(int minX, int maxX, int minY, int maxY, int minZ, int maxZ, BlockState state) {
-            for (int y = minY; y <= maxY; y++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    for (int x = minX; x <= maxX; x++) set(x, y, z, state);
-                }
-            }
+            operations.add(new BoxOperation(origin, minX, maxX, minY, maxY, minZ, maxZ, state));
         }
 
         private void set(int x, int y, int z, BlockState state) {
-            visited++;
-            BlockPos position = origin.offset(x, y, z);
-            if (!level.getBlockState(position).equals(state)) {
-                level.setBlock(position, state, UPDATE_FLAGS);
-                changed++;
-            }
+            fill(x, x, y, y, z, z, state);
         }
     }
 

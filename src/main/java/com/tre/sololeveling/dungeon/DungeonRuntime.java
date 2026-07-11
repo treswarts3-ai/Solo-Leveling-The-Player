@@ -34,7 +34,7 @@ public final class DungeonRuntime {
         public static Result fail(String message) { return new Result(false, message); }
     }
 
-    public static final int ARENA_LAYOUT_VERSION = 4;
+    public static final int ARENA_LAYOUT_VERSION = 5;
 
     private static final Map<UUID, Integer> MISSING_BOSS_TICKS = new HashMap<>();
     private static final String PLAYER_RETURN_TAG = "sl_dungeon_return";
@@ -108,15 +108,9 @@ public final class DungeonRuntime {
         ServerLevel dungeonLevel = server.overworld();
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(slot));
         session.setLastActiveGameTime(dungeonLevel.getGameTime());
-        if (!DungeonArena.build(dungeonLevel, session)) {
-            return Result.fail("Master dungeon could not be built");
-        }
-        session.setArenaVersion(ARENA_LAYOUT_VERSION);
-        BlockPos entry = DungeonArena.findSafePlayerPosition(dungeonLevel, DungeonArena.entryPoint(session), 6);
-        if (entry == null) {
-            DungeonArena.clear(dungeonLevel, session);
-            return Result.fail("Dungeon entry could not be made safe");
-        }
+        session.setState(DungeonTypes.SessionState.BUILDING);
+        session.setArenaBuilt(false);
+        session.setPendingArenaJob("build");
 
         for (ServerPlayer member : party) {
             DungeonTypes.ReturnPoint returnPoint = new DungeonTypes.ReturnPoint(member.level().dimension(),
@@ -127,40 +121,68 @@ public final class DungeonRuntime {
             member.getPersistentData().put(PLAYER_RETURN_TAG, recovery);
         }
         data.sessions().put(session.sessionId(), session);
-        data.setDirty();
-
-        for (ServerPlayer member : party) {
-            member.teleportTo(dungeonLevel, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
-            member.sendSystemMessage(Component.literal("[GATE] Entered " + template.displayName() + ".")
-                    .withStyle(ChatFormatting.LIGHT_PURPLE));
-            DungeonHooks.post(new DungeonHooks.GateEnteredEvent(member, session));
+        if (!DungeonArena.queueBuild(session)) {
+            data.sessions().remove(session.sessionId());
+            data.setDirty();
+            return Result.fail("Master dungeon generation could not be queued");
         }
-        return Result.ok("Entered session " + shortId(session.sessionId()));
+        data.setDirty();
+        for (ServerPlayer member : party) {
+            member.sendSystemMessage(Component.literal("[GATE] Stabilizing " + template.displayName()
+                    + " in bounded server-tick batches...").withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+        return Result.ok("Queued session " + shortId(session.sessionId()) + " for staged generation");
     }
 
     public static Result start(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("You are not in a dungeon session");
         if (!session.owner().equals(player.getUUID())) return Result.fail("Only the session owner can start the dungeon");
+        if (session.state() == DungeonTypes.SessionState.BUILDING) {
+            session.setStartRequested(true);
+            DungeonSavedData.get(player.server).setDirty();
+            return Result.ok("Dungeon start queued until staged generation finishes");
+        }
+        return startSession(player.server, session);
+    }
+
+    private static Result startSession(MinecraftServer server, DungeonSession session) {
         if (session.state() != DungeonTypes.SessionState.WAITING) return Result.fail("Session is not waiting to start");
         DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
         if (template == null) return Result.fail("Dungeon template is unavailable");
         session.setState(DungeonTypes.SessionState.ACTIVE);
+        session.setStartRequested(false);
         session.setRemainingTicks(template.totalTimeTicks());
         DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
         session.setObjectiveTicksRemaining(objective == null ? 20 : objective.timeLimitTicks());
-        session.setLastActiveGameTime(player.serverLevel().getGameTime());
-        DungeonSavedData.get(player.server).setDirty();
-        broadcast(player.server, session, "[DUNGEON] Started: " + template.displayName(), ChatFormatting.RED);
-        announceObjective(player.server, session, objective);
+        ServerLevel level = server.getLevel(session.dungeonDimension());
+        session.setLastActiveGameTime(level == null ? server.overworld().getGameTime() : level.getGameTime());
+        DungeonSavedData.get(server).setDirty();
+        broadcast(server, session, "[DUNGEON] Started: " + template.displayName(), ChatFormatting.RED);
+        announceObjective(server, session, objective);
         DungeonHooks.post(new DungeonHooks.SessionStartedEvent(session));
         return Result.ok("Dungeon started");
     }
 
     public static void tick(MinecraftServer server) {
         DungeonSavedData data = DungeonSavedData.get(server);
+        for (DungeonArena.JobResult result : DungeonArena.tickJobs(server)) {
+            handleArenaJobResult(server, data, result);
+        }
+
         long now = server.overworld().getGameTime();
         for (DungeonSession session : new ArrayList<>(data.sessions().values())) {
+            if (session.state() == DungeonTypes.SessionState.CLEANUP) {
+                if (!DungeonArena.hasJob(session.sessionId())) {
+                    if (session.arenaBuilt()) {
+                        if (!DungeonArena.queueClear(session)) data.sessions().remove(session.sessionId());
+                    } else {
+                        data.sessions().remove(session.sessionId());
+                    }
+                    data.setDirty();
+                }
+                continue;
+            }
             if (session.isTerminal()) {
                 if (session.cleanupAfterGameTime() <= now) cleanup(server, session, true);
                 continue;
@@ -168,6 +190,20 @@ public final class DungeonRuntime {
             DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
             if (template == null) {
                 fail(server, session, "Dungeon template was removed");
+                continue;
+            }
+            if (session.state() == DungeonTypes.SessionState.BUILDING) {
+                if (!DungeonArena.hasJob(session.sessionId()) && !resumeArenaJob(session)) {
+                    fail(server, session, "Staged dungeon generation could not resume");
+                } else if (now % 200L == 0L) {
+                    DungeonArena.JobStatus status = DungeonArena.jobStatus(session.sessionId());
+                    if (status != null) {
+                        broadcast(server, session, "[GATE] Stabilization "
+                                + Math.round(status.progress() * 100.0D) + "% (bounded to "
+                                + MasterDungeonBuilder.MAX_BLOCK_CHANGES_PER_TICK + " changes/tick).",
+                                ChatFormatting.DARK_PURPLE);
+                    }
+                }
                 continue;
             }
             if (!recoverArenaVersion(server, session)) continue;
@@ -197,8 +233,79 @@ public final class DungeonRuntime {
         if (now % 20L == 0L) data.setDirty();
     }
 
+    private static boolean resumeArenaJob(DungeonSession session) {
+        return switch (session.pendingArenaJob()) {
+            case "rebuild" -> DungeonArena.queueRebuild(session);
+            case "migration" -> session.hasMigrationOrigin()
+                    && DungeonArena.queueMigration(session, session.migrationOrigin());
+            default -> DungeonArena.queueBuild(session);
+        };
+    }
+
+    private static void handleArenaJobResult(MinecraftServer server, DungeonSavedData data,
+                                             DungeonArena.JobResult result) {
+        DungeonSession session = data.sessions().get(result.sessionId());
+        if (session == null) return;
+        if (!result.success()) {
+            if (result.purpose() == DungeonArena.JobPurpose.CLEAR) {
+                session.setArenaBuilt(false);
+                session.setPendingArenaJob("");
+                data.sessions().remove(session.sessionId());
+                data.setDirty();
+            } else {
+                fail(server, session, result.error().isBlank() ? "Dungeon generation job failed" : result.error());
+            }
+            return;
+        }
+        if (result.purpose() == DungeonArena.JobPurpose.CLEAR) {
+            session.setArenaBuilt(false);
+            session.setPendingArenaJob("");
+            if (session.state() == DungeonTypes.SessionState.CLEANUP) data.sessions().remove(session.sessionId());
+            data.setDirty();
+            return;
+        }
+
+        session.recordGeneration(result.report());
+        session.setPendingArenaJob("");
+        session.setMigrationOrigin(null);
+        session.setArenaBuilt(true);
+        ServerLevel level = server.getLevel(session.dungeonDimension());
+        if (level == null) {
+            fail(server, session, "Dungeon dimension unavailable after generation");
+            return;
+        }
+        List<String> errors = DungeonArena.validate(level, session);
+        if (!errors.isEmpty()) {
+            fail(server, session, "Generated dungeon failed validation: "
+                    + String.join("; ", errors.subList(0, Math.min(4, errors.size()))));
+            return;
+        }
+        MasterDungeonBuilder.closeCheckpoints(level, session.arenaOrigin());
+        session.setArenaVersion(ARENA_LAYOUT_VERSION);
+        session.setState(DungeonTypes.SessionState.WAITING);
+        BlockPos entry = DungeonArena.findSafePlayerPosition(level, DungeonArena.entryPoint(session), 8);
+        if (entry == null) {
+            fail(server, session, "Generated dungeon entry is unsafe");
+            return;
+        }
+        DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
+        boolean teleportedMember = false;
+        for (UUID memberId : session.members()) {
+            ServerPlayer member = server.getPlayerList().getPlayer(memberId);
+            if (member == null) continue;
+            member.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
+            teleportedMember = true;
+            member.sendSystemMessage(Component.literal("[GATE] Entered "
+                    + (template == null ? MasterDungeonBuilder.DISPLAY_NAME : template.displayName()) + ".")
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+            DungeonHooks.post(new DungeonHooks.GateEnteredEvent(member, session));
+        }
+        data.setDirty();
+        if (session.startRequested() && teleportedMember) startSession(server, session);
+    }
+
     private static boolean recoverArenaVersion(MinecraftServer server, DungeonSession session) {
-        if (session.arenaVersion() >= ARENA_LAYOUT_VERSION) return true;
+        if (session.arenaVersion() >= ARENA_LAYOUT_VERSION && session.arenaBuilt()) return true;
         if (session.state() != DungeonTypes.SessionState.WAITING) {
             fail(server, session, "Dungeon layout changed during an active saved session");
             return false;
@@ -209,26 +316,22 @@ public final class DungeonRuntime {
             return false;
         }
         DungeonArena.discardSessionEntities(level, session);
-        DungeonArena.clearLegacyArena(level, session);
+        BlockPos oldOrigin = session.arenaOrigin();
+        boolean legacySurfaceArena = oldOrigin.getY() > 0;
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(session.arenaSlot()));
-        if (!DungeonArena.build(level, session)) {
-            fail(server, session, "Master dungeon could not be recovered");
+        session.setState(DungeonTypes.SessionState.BUILDING);
+        session.setArenaBuilt(false);
+        session.setPendingArenaJob(legacySurfaceArena ? "migration" : "rebuild");
+        session.setMigrationOrigin(legacySurfaceArena ? oldOrigin : null);
+        boolean queued = legacySurfaceArena ? DungeonArena.queueMigration(session, oldOrigin)
+                : DungeonArena.queueRebuild(session);
+        if (!queued) {
+            fail(server, session, "Master dungeon recovery could not be queued");
             return false;
         }
-        session.setArenaVersion(ARENA_LAYOUT_VERSION);
-        BlockPos entry = DungeonArena.findSafePlayerPosition(level, DungeonArena.entryPoint(session), 6);
-        if (entry == null) {
-            fail(server, session, "Recovered dungeon entry is unsafe");
-            return false;
-        }
-        for (UUID memberId : session.members()) {
-            ServerPlayer member = server.getPlayerList().getPlayer(memberId);
-            if (member != null && (member.level() != level || !DungeonArena.bounds(session).contains(member.position()))) {
-                member.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
-            }
-        }
+        broadcast(server, session, "[DUNGEON] Updating saved arena in bounded tick batches.", ChatFormatting.YELLOW);
         DungeonSavedData.get(server).setDirty();
-        return true;
+        return false;
     }
 
     private static void tickObjective(MinecraftServer server, DungeonSavedData data, DungeonSession session,
@@ -484,7 +587,13 @@ public final class DungeonRuntime {
 
     public static void recoverPlayer(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
+        if (session != null && session.state() == DungeonTypes.SessionState.BUILDING) {
+            player.sendSystemMessage(Component.literal("[GATE] Dungeon generation is still stabilizing.")
+                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+            return;
+        }
         if (session != null && !session.isTerminal()) {
+            if (!session.arenaBuilt()) return;
             ServerLevel level = player.server.getLevel(session.dungeonDimension());
             if (level == null) {
                 fail(player.server, session, "Dungeon dimension unavailable during login recovery");
@@ -497,6 +606,9 @@ public final class DungeonRuntime {
                     return;
                 }
                 player.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
+            }
+            if (session.state() == DungeonTypes.SessionState.WAITING && session.startRequested()) {
+                startSession(player.server, session);
             }
             return;
         }
@@ -520,7 +632,7 @@ public final class DungeonRuntime {
         int count = data.sessions().size();
         for (DungeonSession session : new ArrayList<>(data.sessions().values())) cleanup(server, session, true);
         data.setDirty();
-        return Result.ok("Cleared " + count + " dungeon sessions");
+        return Result.ok("Queued cleanup for " + count + " dungeon sessions");
     }
 
     public static Result spawnWave(ServerPlayer player, String waveId) {
@@ -576,29 +688,41 @@ public final class DungeonRuntime {
     public static Result regenerate(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("Enter the master dungeon first");
+        if (session.state() == DungeonTypes.SessionState.BUILDING
+                || session.state() == DungeonTypes.SessionState.CLEANUP) {
+            return Result.fail("A dungeon generation job is already active");
+        }
         ServerLevel level = player.server.getLevel(session.dungeonDimension());
         if (level == null) return Result.fail("Dungeon dimension unavailable");
+        boolean restartAfterBuild = session.state() == DungeonTypes.SessionState.ACTIVE;
+        for (UUID memberId : session.members()) {
+            ServerPlayer member = player.server.getPlayerList().getPlayer(memberId);
+            if (member != null) returnPlayer(player.server, session, member);
+        }
         discardEncounterState(level, session);
-        DungeonArena.clear(level, session);
-        if (!DungeonArena.build(level, session)) return Result.fail("Master dungeon rebuild failed");
-        session.setArenaVersion(ARENA_LAYOUT_VERSION);
-        BlockPos entry = DungeonArena.findSafePlayerPosition(level, DungeonArena.entryPoint(session), 8);
-        if (entry == null) return Result.fail("Rebuilt dungeon entry is unsafe");
-        player.teleportTo(level, entry.getX() + 0.5D, entry.getY(), entry.getZ() + 0.5D, 0.0F, 0.0F);
+        DungeonArena.cancelJob(session.sessionId());
+        session.setState(DungeonTypes.SessionState.BUILDING);
+        session.setArenaBuilt(false);
+        session.setArenaVersion(0);
+        session.setStartRequested(restartAfterBuild);
+        session.setPendingArenaJob("rebuild");
+        session.setMigrationOrigin(null);
+        if (!DungeonArena.queueRebuild(session)) return Result.fail("Master dungeon rebuild could not be queued");
         DungeonSavedData.get(player.server).setDirty();
-        return Result.ok("Regenerated " + MasterDungeonBuilder.DISPLAY_NAME);
+        return Result.ok("Queued staged regeneration for " + MasterDungeonBuilder.DISPLAY_NAME);
     }
 
     public static Result deleteCurrent(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("No dungeon session found");
         cleanup(player.server, session, true);
-        return Result.ok("Deleted the active master dungeon session");
+        return Result.ok("Queued deletion of the active master dungeon session");
     }
 
     public static Result validateCurrent(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("Enter the master dungeon first");
+        if (!session.arenaBuilt()) return Result.fail("Dungeon generation is still in progress");
         ServerLevel level = player.server.getLevel(session.dungeonDimension());
         if (level == null) return Result.fail("Dungeon dimension unavailable");
         List<String> errors = DungeonArena.validate(level, session);
@@ -609,6 +733,7 @@ public final class DungeonRuntime {
     public static Result teleportRegion(ServerPlayer player, String region) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("Enter the master dungeon first");
+        if (!session.arenaBuilt()) return Result.fail("Dungeon generation is still in progress");
         ServerLevel level = player.server.getLevel(session.dungeonDimension());
         BlockPos target = DungeonArena.regionPoint(session, region);
         if (level == null || target == null) return Result.fail("Unknown dungeon region: " + region);
@@ -621,6 +746,7 @@ public final class DungeonRuntime {
     public static Result debugBounds(ServerPlayer player) {
         DungeonSession session = findSession(player.server, player.getUUID());
         if (session == null) return Result.fail("Enter the master dungeon first");
+        if (!session.arenaBuilt()) return Result.fail("Dungeon generation is still in progress");
         ServerLevel level = player.server.getLevel(session.dungeonDimension());
         if (level == null) return Result.fail("Dungeon dimension unavailable");
         DungeonArena.debugBounds(level, session);
@@ -655,13 +781,18 @@ public final class DungeonRuntime {
         DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
         String objectiveText = objective == null ? "none"
                 : objective.id() + " " + session.objectiveProgress() + "/" + objective.target();
+        DungeonArena.JobStatus job = DungeonArena.jobStatus(session.sessionId());
+        String jobText = job == null ? "none" : job.mode() + " " + Math.round(job.progress() * 100.0D) + "%"
+                + " (" + job.changedBlocks() + " changed, " + job.elapsedTicks() + " ticks)";
         return "Session " + shortId(session.sessionId()) + " | gate=" + session.gateId()
                 + " | template=" + session.templateId() + " | state=" + session.state()
                 + " | objective=" + objectiveText + " | time=" + session.remainingTicks() / 20
                 + "s | objectiveTime=" + session.objectiveTicksRemaining() / 20 + "s | live="
                 + session.liveEnemyCount() + " | spawned=" + session.totalSpawns()
-                + " | layout=" + session.arenaVersion() + " | rewarded="
-                + session.rewardedMemberCount() + "/" + session.members().size();
+                + " | layout=" + session.arenaVersion() + " | buildJob=" + jobText
+                + " | lastBuild=" + session.generationChangedBlocks() + " changed/"
+                + session.generationTicks() + " ticks, max=" + session.generationMaxChangedPerTick() + " changes/tick"
+                + " | rewarded=" + session.rewardedMemberCount() + "/" + session.members().size();
     }
 
     private static void cleanup(MinecraftServer server, DungeonSession session, boolean removeRecord) {
@@ -670,15 +801,22 @@ public final class DungeonRuntime {
             ServerPlayer player = server.getPlayerList().getPlayer(memberId);
             if (player != null) returnPlayer(server, session, player);
         }
-        if (level != null) {
-            DungeonArena.discardSessionEntities(level, session);
-            if (session.arenaBuilt()) DungeonArena.clear(level, session);
-        }
+        boolean partialJob = DungeonArena.cancelJob(session.sessionId());
+        if (level != null) DungeonArena.discardSessionEntities(level, session);
         DungeonBoss.remove(session);
         MISSING_BOSS_TICKS.remove(session.sessionId());
         session.setState(DungeonTypes.SessionState.CLEANUP);
+        session.setStartRequested(false);
+        session.setPendingArenaJob("clear");
+        session.setMigrationOrigin(null);
         DungeonSavedData data = DungeonSavedData.get(server);
-        if (removeRecord) data.sessions().remove(session.sessionId());
+        boolean requiresClear = level != null && (session.arenaBuilt() || partialJob);
+        if (requiresClear) {
+            session.setArenaBuilt(true);
+            if (!DungeonArena.queueClear(session) && removeRecord) data.sessions().remove(session.sessionId());
+        } else if (removeRecord) {
+            data.sessions().remove(session.sessionId());
+        }
         data.setDirty();
     }
 

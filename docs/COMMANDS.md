@@ -44,3 +44,7 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl dungeon debug lighting` | Describe the active lighting palette |
 | `/sl dungeon teleport <region>` | Teleport safely to an authored debug region |
 | `/sl dungeon complete` | Complete the current dungeon for testing |
+
+## Master dungeon generation behavior
+
+Entering or regenerating `master` queues staged generation rather than changing the whole arena in one tick. Use `/sl dungeon inspect_session` to see percentage, elapsed job ticks, changed blocks, and the enforced per-tick maximum. Portal entry can queue the dungeon start; it begins automatically after validation and safe teleportation.

@@ -119,18 +119,22 @@ A custom dimension would provide stronger isolation, but it expands the change i
 
 ## Performance conclusions
 
-The old implementation already avoided full-world entity scans and used client-update block flags. The rebuild retains those protections and adds:
+The old implementation avoided full-world entity scans and used client-update block flags, but its complete arena build and cleanup still ran synchronously. That was rejected for the master dungeon. The final runtime uses a resumable operation queue with hard per-tick ceilings:
 
-- deterministic bounds
+- 16,384 block visits per server tick
+- 4,096 actual block changes per server tick
+- deterministic operation order
 - skipped writes when the target state already matches
+- persisted build, rebuild, migration, and cleanup intent
+- idempotent restart after save/reload
+- players remain safely outside until marker validation succeeds
+- cleanup retains the arena slot until the bounded clear job completes
 - no block entities except the reward chest
-- no random jigsaw search
-- no entity placement in the blueprint
-- bounded chunk loading for the session arena
+- no random jigsaw search or entity placement in the blueprint
 - bounded entity cleanup inside the session AABB
-- low-frequency gate animation and encounter logic
+- live progress and last-build counters through session inspection
 
-The main remaining performance risk is first-time construction of a substantially larger map. CI can prove compilation and deterministic design metrics, but it cannot measure client frame time or server tick duration. Runtime profiling remains a release playtest requirement. A future optimization path is exporting each of the six regions to reviewed structure templates or staging blueprint operations over several ticks.
+These ceilings bound world mutation volume; they do not by themselves prove a specific millisecond tick duration on every CPU. Dedicated-server profiling remains a release playtest requirement.
 
 ## Layout conclusions
 
@@ -182,10 +186,10 @@ The player repeatedly sees and re-enters the central kingdom, creating orientati
 
 | Risk | Mitigation | Residual risk |
 |---|---|---|
-| First-build tick spike | bounded writes, skipped identical states, no neighbor updates | requires runtime profiling |
+| First-build tick spike | resumable queue capped at 16,384 visits and 4,096 changes per tick | hardware-specific milliseconds require profiling |
 | Corridor/room seam | fixed graph and post-build marker validation | visual seam review still required |
 | Unsafe spawns | sturdy-floor/collision/fluid search | mob-specific pathfinding requires playtest |
-| Old saved sessions | layout version bump; removed-template sessions fail and clean safely | old active players may be returned on next tick |
+| Old saved sessions | layout version 5; persisted migration job clears legacy arena and builds the new slot in batches | interrupted jobs restart idempotently from their saved intent |
 | Navigation confusion | six region identities, central landmark, lighting, loops, shortcuts | needs full human walkthrough |
 | Visual repetition | distinct region palettes, ceiling heights, landmarks, architectural families | code-authored detail cannot replace final in-game art pass |
-| Oversized cleanup | bounded room/link envelopes | cleanup tick impact needs profiling |
+| Oversized cleanup | same bounded job queue and retained slot until completion | hardware-specific milliseconds require profiling |

@@ -23,6 +23,7 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.server.ServerLifecycleHooks;
@@ -187,6 +188,11 @@ public final class DungeonEvents {
                 .then(Commands.literal("spawn_test_boss").requires(source -> source.hasPermission(2))
                         .executes(context -> send(context.getSource(), DungeonRuntime.spawnTestBoss(
                                 context.getSource().getPlayerOrException()))));
+    }
+
+    @SubscribeEvent
+    public static void serverStopped(ServerStoppedEvent event) {
+        DungeonArena.resetJobs();
     }
 
     @SubscribeEvent

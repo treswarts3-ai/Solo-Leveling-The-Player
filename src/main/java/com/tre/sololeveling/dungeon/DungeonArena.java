@@ -2,6 +2,7 @@ package com.tre.sololeveling.dungeon;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
@@ -13,7 +14,11 @@ import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /** Runtime bridge between dungeon sessions, gates, and the one master layout. */
 public final class DungeonArena {
@@ -25,6 +30,18 @@ public final class DungeonArena {
     private static final int GATE_MAX_X = 3;
     private static final int GATE_MIN_Y = 0;
     private static final int GATE_MAX_Y = 6;
+    private static final Map<UUID, ActiveArenaJob> ACTIVE_JOBS = new LinkedHashMap<>();
+
+    public enum JobPurpose { BUILD, REBUILD, MIGRATION, CLEAR }
+
+    public record JobResult(UUID sessionId, JobPurpose purpose, boolean success,
+                            MasterDungeonBuilder.JobReport report, String error) {}
+
+    public record JobStatus(JobPurpose purpose, String mode, double progress, long visitedBlocks,
+                            long plannedVisits, long changedBlocks, int elapsedTicks) {}
+
+    private record ActiveArenaJob(net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimension,
+                                  JobPurpose purpose, MasterDungeonBuilder.BuildJob job) {}
 
     public static BlockPos originForSlot(int slot) {
         int x = slot % SLOT_COLUMNS;
@@ -41,20 +58,87 @@ public final class DungeonArena {
                 origin.getX() + 49, origin.getY() + 25, origin.getZ() + 49);
     }
 
-    public static boolean build(ServerLevel level, DungeonSession session) {
-        if (!MasterDungeonBuilder.ID.equals(session.templateId())) {
-            session.setArenaBuilt(false);
+    public static boolean queueBuild(DungeonSession session) {
+        if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
             return false;
         }
-        loadArenaChunks(level, session);
-        MasterDungeonBuilder.BuildReport report = MasterDungeonBuilder.build(level, session.arenaOrigin());
-        if (!report.valid()) {
-            session.setArenaBuilt(false);
-            return false;
-        }
-        MasterDungeonBuilder.closeCheckpoints(level, session.arenaOrigin());
-        session.setArenaBuilt(true);
+        ACTIVE_JOBS.put(session.sessionId(), new ActiveArenaJob(session.dungeonDimension(), JobPurpose.BUILD,
+                MasterDungeonBuilder.buildJob(session.arenaOrigin())));
         return true;
+    }
+
+    public static boolean queueRebuild(DungeonSession session) {
+        if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
+            return false;
+        }
+        ACTIVE_JOBS.put(session.sessionId(), new ActiveArenaJob(session.dungeonDimension(), JobPurpose.REBUILD,
+                MasterDungeonBuilder.rebuildJob(session.arenaOrigin())));
+        return true;
+    }
+
+    public static boolean queueMigration(DungeonSession session, BlockPos oldOrigin) {
+        if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
+            return false;
+        }
+        ACTIVE_JOBS.put(session.sessionId(), new ActiveArenaJob(session.dungeonDimension(), JobPurpose.MIGRATION,
+                MasterDungeonBuilder.legacyMigrationJob(oldOrigin, session.arenaOrigin())));
+        return true;
+    }
+
+    public static boolean queueClear(DungeonSession session) {
+        if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
+            return false;
+        }
+        ACTIVE_JOBS.put(session.sessionId(), new ActiveArenaJob(session.dungeonDimension(), JobPurpose.CLEAR,
+                MasterDungeonBuilder.clearJob(session.arenaOrigin())));
+        return true;
+    }
+
+    public static boolean hasJob(UUID sessionId) {
+        return ACTIVE_JOBS.containsKey(sessionId);
+    }
+
+    public static void resetJobs() {
+        ACTIVE_JOBS.clear();
+    }
+
+    public static boolean cancelJob(UUID sessionId) {
+        return ACTIVE_JOBS.remove(sessionId) != null;
+    }
+
+    public static JobStatus jobStatus(UUID sessionId) {
+        ActiveArenaJob active = ACTIVE_JOBS.get(sessionId);
+        if (active == null) return null;
+        MasterDungeonBuilder.BuildJob job = active.job();
+        return new JobStatus(active.purpose(), job.mode(), job.progress(), job.visitedBlocks(),
+                job.plannedVisits(), job.changedBlocks(), job.elapsedTicks());
+    }
+
+    public static List<JobResult> tickJobs(MinecraftServer server) {
+        List<JobResult> completed = new ArrayList<>();
+        var iterator = ACTIVE_JOBS.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, ActiveArenaJob> entry = iterator.next();
+            ActiveArenaJob active = entry.getValue();
+            ServerLevel level = server.getLevel(active.dimension());
+            if (level == null) {
+                completed.add(new JobResult(entry.getKey(), active.purpose(), false,
+                        active.job().report(), "Dungeon dimension unavailable"));
+                iterator.remove();
+                continue;
+            }
+            try {
+                MasterDungeonBuilder.TickReport tick = active.job().tick(level);
+                if (!tick.complete()) continue;
+                completed.add(new JobResult(entry.getKey(), active.purpose(), true,
+                        active.job().report(), ""));
+            } catch (RuntimeException exception) {
+                completed.add(new JobResult(entry.getKey(), active.purpose(), false,
+                        active.job().report(), "Generation error: " + exception.getClass().getSimpleName()));
+            }
+            iterator.remove();
+        }
+        return completed;
     }
 
     public static BlockPos encounterCenter(DungeonSession session) {
@@ -129,24 +213,6 @@ public final class DungeonArena {
                 && level.getBlockState(floor).isFaceSturdy(level, floor, Direction.UP);
     }
 
-    public static void clear(ServerLevel level, DungeonSession session) {
-        loadArenaChunks(level, session);
-        if (MasterDungeonBuilder.ID.equals(session.templateId())) {
-            MasterDungeonBuilder.clear(level, session.arenaOrigin());
-        } else if (session.arenaOrigin().getY() > 0) {
-            clearLegacyArena(level, session);
-        } else {
-            fill(level, session.arenaOrigin(), -46, 46, -4, 20, -46, 46,
-                    Blocks.DEEPSLATE.defaultBlockState());
-        }
-        session.setArenaBuilt(false);
-    }
-
-    public static void clearLegacyArena(ServerLevel level, DungeonSession session) {
-        if (session.arenaOrigin().getY() <= 0) return;
-        fill(level, session.arenaOrigin(), -48, 48, -2, 20, -48, 48, Blocks.AIR.defaultBlockState());
-        session.setArenaBuilt(false);
-    }
 
     public static void placeGateMarker(ServerLevel level, DungeonTypes.GateDefinition gate) {
         BlockPos base = gate.position();
@@ -218,7 +284,6 @@ public final class DungeonArena {
     }
 
     public static void discardSessionEntities(ServerLevel level, DungeonSession session) {
-        loadArenaChunks(level, session);
         for (Entity entity : level.getEntities((Entity)null, bounds(session), entity ->
                 entity.getPersistentData().hasUUID(DungeonTypes.TAG_SESSION)
                         && session.sessionId().equals(entity.getPersistentData().getUUID(DungeonTypes.TAG_SESSION)))) {
@@ -245,28 +310,8 @@ public final class DungeonArena {
         MasterDungeonBuilder.debugBounds(level, session.arenaOrigin());
     }
 
-    private static void fill(ServerLevel level, BlockPos origin, int minX, int maxX, int minY, int maxY,
-                             int minZ, int maxZ, BlockState state) {
-        for (int y = minY; y <= maxY; y++) {
-            for (int z = minZ; z <= maxZ; z++) {
-                for (int x = minX; x <= maxX; x++) set(level, origin.offset(x, y, z), state);
-            }
-        }
-    }
-
     private static void set(ServerLevel level, BlockPos pos, BlockState state) {
         if (!level.getBlockState(pos).equals(state)) level.setBlock(pos, state, STRUCTURE_UPDATE_FLAGS);
-    }
-
-    private static void loadArenaChunks(ServerLevel level, DungeonSession session) {
-        AABB bounds = bounds(session);
-        int minChunkX = ((int)Math.floor(bounds.minX)) >> 4;
-        int maxChunkX = ((int)Math.ceil(bounds.maxX)) >> 4;
-        int minChunkZ = ((int)Math.floor(bounds.minZ)) >> 4;
-        int maxChunkZ = ((int)Math.ceil(bounds.maxZ)) >> 4;
-        for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
-            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) level.getChunk(chunkX, chunkZ);
-        }
     }
 
     private DungeonArena() {}

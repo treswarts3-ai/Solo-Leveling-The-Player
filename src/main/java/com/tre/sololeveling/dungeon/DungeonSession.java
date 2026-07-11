@@ -44,6 +44,15 @@ public final class DungeonSession {
     private boolean arenaBuilt;
     private boolean encounterSpawned;
     private boolean rewardRoomCreated;
+    private boolean startRequested;
+    private long generationVisitedBlocks;
+    private long generationChangedBlocks;
+    private int generationTicks;
+    private int generationMaxVisitedPerTick;
+    private int generationMaxChangedPerTick;
+    private String pendingArenaJob = "";
+    private BlockPos migrationOrigin = BlockPos.ZERO;
+    private boolean hasMigrationOrigin;
     private UUID bossId;
     private String failureReason = "";
 
@@ -84,6 +93,15 @@ public final class DungeonSession {
     public boolean rewardGrantedTo(UUID playerId) { return rewardedMembers.contains(playerId); }
     public int rewardedMemberCount() { return rewardedMembers.size(); }
     public boolean rewardRoomCreated() { return rewardRoomCreated; }
+    public boolean startRequested() { return startRequested; }
+    public long generationVisitedBlocks() { return generationVisitedBlocks; }
+    public long generationChangedBlocks() { return generationChangedBlocks; }
+    public int generationTicks() { return generationTicks; }
+    public int generationMaxVisitedPerTick() { return generationMaxVisitedPerTick; }
+    public int generationMaxChangedPerTick() { return generationMaxChangedPerTick; }
+    public String pendingArenaJob() { return pendingArenaJob; }
+    public BlockPos migrationOrigin() { return migrationOrigin; }
+    public boolean hasMigrationOrigin() { return hasMigrationOrigin; }
     public UUID bossId() { return bossId; }
     public String failureReason() { return failureReason; }
     public boolean contains(UUID playerId) { return members.contains(playerId); }
@@ -109,6 +127,20 @@ public final class DungeonSession {
     public boolean markRewardGranted(UUID playerId) { return members.contains(playerId) && rewardedMembers.add(playerId); }
     public void setRewardGranted(boolean value) { rewardDistributionStarted = value; if (!value) rewardedMembers.clear(); }
     public void setRewardRoomCreated(boolean value) { rewardRoomCreated = value; }
+    public void setStartRequested(boolean value) { startRequested = value; }
+    public void setPendingArenaJob(String value) { pendingArenaJob = value == null ? "" : value.trim().toLowerCase(java.util.Locale.ROOT); }
+    public void setMigrationOrigin(BlockPos value) {
+        hasMigrationOrigin = value != null;
+        migrationOrigin = value == null ? BlockPos.ZERO : value.immutable();
+    }
+    public void recordGeneration(MasterDungeonBuilder.JobReport report) {
+        if (report == null) return;
+        generationVisitedBlocks = report.visitedBlocks();
+        generationChangedBlocks = report.changedBlocks();
+        generationTicks = report.elapsedTicks();
+        generationMaxVisitedPerTick = report.maxVisitedInTick();
+        generationMaxChangedPerTick = report.maxChangedInTick();
+    }
     public void setBossId(UUID value) { bossId = value; }
     public void setFailureReason(String value) { failureReason = value == null ? "" : value; }
 
@@ -135,6 +167,15 @@ public final class DungeonSession {
         tag.putBoolean("encounter_spawned", encounterSpawned);
         tag.putBoolean("reward_granted", rewardDistributionStarted);
         tag.putBoolean("reward_room_created", rewardRoomCreated);
+        tag.putBoolean("start_requested", startRequested);
+        tag.putLong("generation_visited", generationVisitedBlocks);
+        tag.putLong("generation_changed", generationChangedBlocks);
+        tag.putInt("generation_ticks", generationTicks);
+        tag.putInt("generation_max_visited_tick", generationMaxVisitedPerTick);
+        tag.putInt("generation_max_changed_tick", generationMaxChangedPerTick);
+        tag.putString("pending_arena_job", pendingArenaJob);
+        tag.putBoolean("has_migration_origin", hasMigrationOrigin);
+        if (hasMigrationOrigin) tag.putLong("migration_origin", migrationOrigin.asLong());
         tag.putString("failure_reason", failureReason);
         if (bossId != null) tag.putUUID("boss_id", bossId);
         ListTag memberList = new ListTag();
@@ -174,6 +215,15 @@ public final class DungeonSession {
         session.arenaBuilt = tag.getBoolean("arena_built");
         session.encounterSpawned = tag.getBoolean("encounter_spawned");
         session.rewardRoomCreated = tag.getBoolean("reward_room_created");
+        session.startRequested = tag.getBoolean("start_requested");
+        session.generationVisitedBlocks = Math.max(0L, tag.getLong("generation_visited"));
+        session.generationChangedBlocks = Math.max(0L, tag.getLong("generation_changed"));
+        session.generationTicks = Math.max(0, tag.getInt("generation_ticks"));
+        session.generationMaxVisitedPerTick = Math.max(0, tag.getInt("generation_max_visited_tick"));
+        session.generationMaxChangedPerTick = Math.max(0, tag.getInt("generation_max_changed_tick"));
+        session.pendingArenaJob = tag.getString("pending_arena_job");
+        session.hasMigrationOrigin = tag.getBoolean("has_migration_origin");
+        if (session.hasMigrationOrigin) session.migrationOrigin = BlockPos.of(tag.getLong("migration_origin"));
         session.failureReason = tag.getString("failure_reason");
         if (tag.hasUUID("boss_id")) session.bossId = tag.getUUID("boss_id");
         ListTag returns = tag.getList("return_points", Tag.TAG_COMPOUND);
