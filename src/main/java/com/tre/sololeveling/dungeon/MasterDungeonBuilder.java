@@ -290,6 +290,20 @@ public final class MasterDungeonBuilder {
         return REGION_POINTS.get(raw.trim().toLowerCase(Locale.ROOT));
     }
 
+    public static String location(BlockPos local) {
+        if (local == null) return "outside";
+        for (Room room : ROOMS) {
+            if (local.getX() >= room.minX && local.getX() <= room.maxX
+                    && local.getZ() >= room.minZ && local.getZ() <= room.maxZ
+                    && local.getY() >= room.floorY - 2 && local.getY() <= room.ceilingY() + 2) {
+                return room.region + "/" + room.id;
+            }
+        }
+        return REGION_POINTS.entrySet().stream()
+                .min(java.util.Comparator.comparingDouble(entry -> entry.getValue().distSqr(local)))
+                .map(java.util.Map.Entry::getKey).orElse("outside");
+    }
+
     public static String info() {
         return DISPLAY_NAME + " | bounds 173x50x265 | 43 spaces | 13 major rooms | 6 regions | "
                 + "20,774 walkable blocks | 848-block critical path | 6 loops | 3 shortcuts | 7 secrets";
