@@ -79,6 +79,7 @@ This repository is structured for parallel development through isolated feature 
 - [Asset manifest](docs/ASSET_MANIFEST.md)
 - [Research notes](docs/RESEARCH.md)
 - [Testing report](docs/TESTING_REPORT.md)
+- [Testing and debugging infrastructure](docs/DEBUGGING.md)
 - [Changelog](CHANGELOG.md)
 
 ## Release status
