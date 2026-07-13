@@ -5,7 +5,7 @@ Status values: **Verified**, **Implemented—needs gameplay testing**, **Partial
 | Area | Status | Current checkpoint | Remaining acceptance work |
 |---|---|---|---|
 | Forge 1.20.1 / Java 17 build | Verified | GitHub CI clean build passed | Continue validating every merge |
-| Persistent Hunter data and migration | Implemented—needs gameplay testing | Defaults, migration, clone/login/dimension synchronization | Long-session and old-save testing |
+| Persistent Hunter data and migration | Implemented—needs gameplay testing | Versioned schema-v5 migration, owned-field repair/clamping, clone/login/respawn/dimension synchronization | Long-session and old-save testing |
 | XP, levels, stats, mana, gold, ranks and jobs | Implemented—needs gameplay testing | Core progression and admin controls exist | Balance and boundary testing |
 | System HUD and interfaces | Implemented—needs gameplay testing | Unified responsive System screen, configurable HUD, notification queue, ability slots and key-conflict feedback | GUI scales 1-4, windowed/fullscreen, ultrawide, overlap and accessibility review |
 | Commands | Implemented—needs gameplay testing | Progression, ability, quest, shadow, dungeon, inspection and god-powers test controls | In-game permission, tab-completion and failure-path verification |
@@ -23,6 +23,6 @@ Status values: **Verified**, **Implemented—needs gameplay testing**, **Partial
 | Original sounds and particles | Partial | Procedural OGG sounds and vanilla-particle presentation | Sound mix, custom particles and animation timing |
 | Player and weapon animations | Partial | Vanilla poses and feedback | Optional animation dependency or safe custom adapter |
 | Dedicated-server compatibility | Implemented—needs runtime testing | Common/client package separation and CI compilation | Actual dedicated server launch and two-player session |
-| Performance and packet security | Partial | Packet rate limits, server validation and reduced shadow sync | Profiling, malformed packet tests and large-shadow stress test |
-| Abyssal Necropolis master dungeon | Implemented—needs gameplay testing | Staged generation, marker validation, encounters, boss, rewards, exit and cleanup | Full gate-to-cleanup run, death/reconnect/full-inventory/two-player cases |
+| Performance and packet security | Implemented—needs gameplay testing | Packet rate/debounce limits, strict action-ID and player-state validation, bounded rejection diagnostics, and reduced shadow sync | Profiling, malformed-packet fuzzing and large-shadow stress test |
+| Abyssal Necropolis master dungeon | Implemented—needs gameplay testing | Guarded ten-state lifecycle, isolated saved-record recovery, staged generation, marker validation, encounters, rewards, safe return and cleanup | Full gate-to-cleanup run, death/reconnect/full-inventory/two-player cases |
 | Documentation and release package | Partial | Core docs, CI artifact packaging and a single acceptance checklist | Keep commands, controls, balancing and changelog synchronized with release JAR |
