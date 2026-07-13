@@ -1,5 +1,6 @@
 package com.tre.sololeveling.dungeon;
 
+import com.mojang.logging.LogUtils;
 import com.tre.sololeveling.data.HunterData;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -27,8 +28,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
 
 public final class DungeonRuntime {
+    private static final Logger LOGGER = LogUtils.getLogger();
     public record Result(boolean success, String message) {
         public static Result ok(String message) { return new Result(true, message); }
         public static Result fail(String message) { return new Result(false, message); }
@@ -121,11 +124,13 @@ public final class DungeonRuntime {
             member.getPersistentData().put(PLAYER_RETURN_TAG, recovery);
         }
         data.sessions().put(session.sessionId(), session);
+        log(session, "Session created", "gate=" + gate.gateId() + ", template=" + template.id());
         if (!DungeonArena.queueBuild(session)) {
             data.sessions().remove(session.sessionId());
             data.setDirty();
             return Result.fail("Master dungeon generation could not be queued");
         }
+        log(session, "Build started", "purpose=build, slot=" + slot);
         data.setDirty();
         for (ServerPlayer member : party) {
             member.sendSystemMessage(Component.literal("[GATE] Stabilizing " + template.displayName()
@@ -263,7 +268,10 @@ public final class DungeonRuntime {
         if (result.purpose() == DungeonArena.JobPurpose.CLEAR) {
             session.setArenaBuilt(false);
             session.setPendingArenaJob("");
-            if (session.state() == DungeonTypes.SessionState.CLEANUP) data.sessions().remove(session.sessionId());
+            if (session.state() == DungeonTypes.SessionState.CLEANUP) {
+                log(session, "Cleanup completed", "arena slot released");
+                data.sessions().remove(session.sessionId());
+            }
             data.setDirty();
             return;
         }
@@ -283,6 +291,8 @@ public final class DungeonRuntime {
                     + String.join("; ", errors.subList(0, Math.min(4, errors.size()))));
             return;
         }
+        log(session, "Build validated", "changed=" + result.report().changedBlocks()
+                + ", ticks=" + result.report().elapsedTicks());
         MasterDungeonBuilder.closeCheckpoints(level, session.arenaOrigin());
         session.setArenaVersion(ARENA_LAYOUT_VERSION);
         session.setState(DungeonTypes.SessionState.WAITING);
@@ -303,6 +313,7 @@ public final class DungeonRuntime {
                     .withStyle(ChatFormatting.LIGHT_PURPLE));
             DungeonHooks.post(new DungeonHooks.GateEnteredEvent(member, session));
         }
+        if (teleportedMember) log(session, "Player teleported", "party entered safe staging position");
         data.setDirty();
         if (session.startRequested() && teleportedMember) startSession(server, session);
     }
@@ -375,6 +386,7 @@ public final class DungeonRuntime {
                     broadcast(server, session, "[DUNGEON] The reward room is open.", ChatFormatting.GOLD);
                 }
             }
+            log(session, "Encounter started", "objective=" + objective.id() + ", type=" + objective.type());
             data.setDirty();
         }
         if (objective.type() == DungeonTypes.ObjectiveType.COLLECTION && level.getGameTime() % 4L == 0L) {
@@ -473,6 +485,7 @@ public final class DungeonRuntime {
         DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
         if (objective == null || session.isTerminal()) return;
         int completedIndex = session.objectiveIndex();
+        log(session, "Objective completed", "objective=" + objective.id() + ", index=" + completedIndex);
         DungeonHooks.post(new DungeonHooks.ObjectiveCompletedEvent(session, objective.id()));
         broadcast(server, session, "[OBJECTIVE COMPLETE] " + objective.displayName(), ChatFormatting.GREEN);
         if (objective.type() == DungeonTypes.ObjectiveType.REWARD) {
@@ -507,6 +520,7 @@ public final class DungeonRuntime {
         session.setCleanupAfterGameTime(server.overworld().getGameTime() + 20L * 60L * 5L);
         if (!session.rewardGranted() && template != null) {
             session.setRewardGranted(true);
+            log(session, "Reward locked", "eligibleMembers=" + session.members().size());
             data.setDirty();
             for (UUID memberId : session.members()) {
                 ServerPlayer player = server.getPlayerList().getPlayer(memberId);
@@ -582,6 +596,7 @@ public final class DungeonRuntime {
         if (session.isTerminal()) return;
         session.setState(DungeonTypes.SessionState.FAILED);
         session.setFailureReason(reason);
+        log(session, "Failure", reason);
         session.setCleanupAfterGameTime(server.overworld().getGameTime() + 100L);
         DungeonBoss.remove(session);
         MISSING_BOSS_TICKS.remove(session.sessionId());
@@ -841,6 +856,11 @@ public final class DungeonRuntime {
                 + " | lastBuild=" + session.generationChangedBlocks() + " changed/"
                 + session.generationTicks() + " ticks, max=" + session.generationMaxChangedPerTick() + " changes/tick"
                 + " | rewarded=" + session.rewardedMemberCount() + "/" + session.members().size();
+    }
+
+    private static void log(DungeonSession session, String transition, String reason) {
+        LOGGER.info("[DUNGEON] {} | session={} state={} party={} reason={}", transition,
+                session.sessionId(), session.state(), session.members(), reason == null ? "" : reason);
     }
 
     private static void cleanup(MinecraftServer server, DungeonSession session, boolean removeRecord) {
