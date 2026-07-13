@@ -26,7 +26,7 @@ public final class AbilityCooldownView {
             AbilityDefinition definition = ability.definition();
             entries.add(new Entry(definition.id(), definition.displayName(),
                     HunterData.cooldownRemaining(player, definition.id()),
-                    Math.max(0, ability.cooldownTicks(player)),
+                    AbilityMastery.adjustCooldown(player, definition.id(), Math.max(0, ability.cooldownTicks(player))),
                     definition.unlock().isUnlocked(player)));
         }
         return Collections.unmodifiableList(entries);

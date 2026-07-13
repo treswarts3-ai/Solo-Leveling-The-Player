@@ -22,6 +22,13 @@ import java.util.function.Predicate;
 public final class AbilityTargeting {
     private static final int MAX_AREA_TARGETS = 64;
 
+    public enum WeightClass {
+        LIGHT(1.0D), MEDIUM(0.72D), HEAVY(0.42D), BOSS(0.22D);
+        private final double forceMultiplier;
+        WeightClass(double forceMultiplier) { this.forceMultiplier = forceMultiplier; }
+        public double forceMultiplier() { return forceMultiplier; }
+    }
+
     public static Entity rayTarget(ServerPlayer player, double maximumRange) {
         double range = Math.max(0.0D, Math.min(32.0D, maximumRange));
         Vec3 start = player.getEyePosition();
@@ -84,6 +91,24 @@ public final class AbilityTargeting {
         Vec3 toTarget = target.getBoundingBox().getCenter().subtract(player.getEyePosition());
         if (toTarget.lengthSqr() < 1.0E-6D) return true;
         return player.getLookAngle().normalize().dot(toTarget.normalize()) >= minimumDot;
+    }
+
+    public static boolean isBehind(ServerPlayer player, LivingEntity target) {
+        Vec3 fromTarget = player.position().subtract(target.position());
+        if (fromTarget.horizontalDistanceSqr() < 1.0E-6D) return false;
+        Vec3 targetForward = target.getLookAngle();
+        Vec3 horizontalForward = new Vec3(targetForward.x, 0.0D, targetForward.z);
+        Vec3 horizontalAttacker = new Vec3(fromTarget.x, 0.0D, fromTarget.z);
+        return horizontalForward.lengthSqr() > 1.0E-6D
+                && horizontalForward.normalize().dot(horizontalAttacker.normalize()) < -0.45D;
+    }
+
+    public static WeightClass weightClass(Entity entity) {
+        if (AbilityEffects.isBoss(entity)) return WeightClass.BOSS;
+        double volume = Math.max(0.0D, entity.getBbWidth() * entity.getBbWidth() * entity.getBbHeight());
+        if (volume >= 6.0D) return WeightClass.HEAVY;
+        if (volume >= 1.2D) return WeightClass.MEDIUM;
+        return WeightClass.LIGHT;
     }
 
     private AbilityTargeting() {

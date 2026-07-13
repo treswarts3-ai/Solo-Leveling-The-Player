@@ -37,6 +37,7 @@ public final class ClientKeyMappings {
     public static final KeyMapping RULERS_AUTHORITY_PUSH = ability("rulers_authority_push", GLFW.GLFW_KEY_UNKNOWN);
     public static final KeyMapping RULERS_AUTHORITY_HOLD = ability("rulers_authority_hold", GLFW.GLFW_KEY_UNKNOWN);
     public static final KeyMapping RULERS_AUTHORITY_THROW = ability("rulers_authority_throw", GLFW.GLFW_KEY_UNKNOWN);
+    public static final KeyMapping RULERS_AUTHORITY_OBJECT = ability("rulers_authority_object", GLFW.GLFW_KEY_UNKNOWN);
     public static final KeyMapping RULERS_AUTHORITY_DASH = ability("rulers_authority_dash", GLFW.GLFW_KEY_UNKNOWN);
     public static final KeyMapping RULERS_AUTHORITY_FLIGHT = ability("rulers_authority_flight", GLFW.GLFW_KEY_UNKNOWN);
     public static final KeyMapping ENHANCED_SENSES = ability("enhanced_senses", GLFW.GLFW_KEY_UNKNOWN);
@@ -52,7 +53,8 @@ public final class ClientKeyMappings {
             bind(BLOODLUST, "bloodlust"), bind(AREA_SLASH, "area_slash"), bind(STEALTH, "stealth"),
             bind(RULERS_AUTHORITY, "rulers_authority"), bind(RULERS_AUTHORITY_PULL, "rulers_authority_pull"),
             bind(RULERS_AUTHORITY_PUSH, "rulers_authority_push"), bind(RULERS_AUTHORITY_HOLD, "rulers_authority_hold"),
-            bind(RULERS_AUTHORITY_THROW, "rulers_authority_throw"), bind(RULERS_AUTHORITY_DASH, "rulers_authority_dash"),
+            bind(RULERS_AUTHORITY_THROW, "rulers_authority_throw"), bind(RULERS_AUTHORITY_OBJECT, "rulers_authority_object"),
+            bind(RULERS_AUTHORITY_DASH, "rulers_authority_dash"),
             bind(RULERS_AUTHORITY_FLIGHT, "rulers_authority_flight"), bind(ENHANCED_SENSES, "enhanced_senses"),
             bind(MONARCH_DOMAIN, "monarch_domain"), bind(SHADOW_EXCHANGE, "shadow_exchange"),
             bind(SHADOW_EXTRACTION, "shadow_extraction"), bind(SHADOW_SUMMONING, "shadow_summoning"),

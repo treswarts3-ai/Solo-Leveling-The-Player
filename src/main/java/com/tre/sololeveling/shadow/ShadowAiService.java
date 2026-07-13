@@ -2,6 +2,7 @@ package com.tre.sololeveling.shadow;
 
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.data.HunterData;
+import com.tre.sololeveling.gameplay.ability.AbilityMastery;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
@@ -69,7 +70,9 @@ public final class ShadowAiService {
         shadow.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 40, 0, false, false));
         if (shadow.level() != owner.level()) return;
 
-        if (HunterData.domainActive(owner)) {
+        boolean inDomain = HunterData.domainActive(owner)
+                && shadow.distanceToSqr(owner) <= Math.pow(AbilityMastery.domainRadius(owner), 2.0D);
+        if (inDomain) {
             shadow.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 30, 0, false, false));
             shadow.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 30, 0, false, false));
             if (owner.tickCount % 20 == 0) {
@@ -90,7 +93,7 @@ public final class ShadowAiService {
             teleportNearOwner(owner, shadow);
         } else if (distance > followDistance(mode) * followDistance(mode)
                 && (shadow.getTarget() == null || mode != Mode.AGGRESSIVE)) {
-            shadow.getNavigation().moveTo(owner, HunterData.domainActive(owner) ? 1.25D : 1.15D);
+            shadow.getNavigation().moveTo(owner, inDomain ? 1.25D : 1.15D);
         }
     }
 

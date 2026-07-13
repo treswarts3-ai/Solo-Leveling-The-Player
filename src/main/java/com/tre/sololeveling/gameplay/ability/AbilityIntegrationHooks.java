@@ -1,6 +1,7 @@
 package com.tre.sololeveling.gameplay.ability;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 
 import java.util.Objects;
 
@@ -10,23 +11,25 @@ import java.util.Objects;
  */
 public final class AbilityIntegrationHooks {
     public interface ShadowAdapter {
-        AbilityResult exchange(ServerPlayer player);
+        Entity exchangeTarget(ServerPlayer player);
+        AbilityResult exchange(ServerPlayer player, Entity preparedTarget);
         AbilityResult extract(ServerPlayer player);
         AbilityResult summon(ServerPlayer player);
     }
 
     public interface QuestListener {
-        void onAbilityActivated(ServerPlayer player, AbilityDefinition definition);
+        void onAbilityResolved(ServerPlayer player, AbilityDefinition definition, int manaSpent);
     }
 
     private static final ShadowAdapter UNAVAILABLE_SHADOWS = new ShadowAdapter() {
-        @Override public AbilityResult exchange(ServerPlayer player) { return AbilityResult.failure("Shadow Exchange is not connected yet."); }
+        @Override public Entity exchangeTarget(ServerPlayer player) { return null; }
+        @Override public AbilityResult exchange(ServerPlayer player, Entity preparedTarget) { return AbilityResult.failure("Shadow Exchange is not connected yet."); }
         @Override public AbilityResult extract(ServerPlayer player) { return AbilityResult.failure("Shadow Extraction is not connected yet."); }
         @Override public AbilityResult summon(ServerPlayer player) { return AbilityResult.failure("Shadow Summoning is not connected yet."); }
     };
 
     private static volatile ShadowAdapter shadowAdapter = UNAVAILABLE_SHADOWS;
-    private static volatile QuestListener questListener = (player, definition) -> { };
+    private static volatile QuestListener questListener = (player, definition, manaSpent) -> { };
 
     public static void installShadowAdapter(ShadowAdapter adapter) {
         shadowAdapter = Objects.requireNonNull(adapter, "adapter");
@@ -45,11 +48,11 @@ public final class AbilityIntegrationHooks {
     }
 
     public static void clearQuestListener() {
-        questListener = (player, definition) -> { };
+        questListener = (player, definition, manaSpent) -> { };
     }
 
-    static void notifyActivated(ServerPlayer player, AbilityDefinition definition) {
-        questListener.onAbilityActivated(player, definition);
+    static void notifyResolved(ServerPlayer player, AbilityDefinition definition, int manaSpent) {
+        questListener.onAbilityResolved(player, definition, manaSpent);
     }
 
     private AbilityIntegrationHooks() {

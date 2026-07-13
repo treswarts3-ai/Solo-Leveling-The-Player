@@ -63,6 +63,10 @@ jobs:
         shell: bash
         run: python tools/validate_ui_assets.py
 
+      - name: Validate Phase 5 ability quality
+        shell: bash
+        run: python tools/validate_ability_quality.py
+
       - name: Build Forge mod
         shell: bash
         run: |

@@ -2,6 +2,7 @@ package com.tre.sololeveling.integration;
 
 import com.tre.sololeveling.dungeon.DungeonHooks;
 import com.tre.sololeveling.gameplay.ShadowHandler;
+import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ability.AbilityIntegrationHooks;
 import com.tre.sololeveling.gameplay.ability.AbilityResult;
 import com.tre.sololeveling.quest.QuestApi;
@@ -12,8 +13,13 @@ import com.tre.sololeveling.shadow.ShadowSummoningService;
 public final class IntegrationBootstrap {
     public static void install() {
         AbilityIntegrationHooks.installShadowAdapter(new AbilityIntegrationHooks.ShadowAdapter() {
-            @Override public AbilityResult exchange(net.minecraft.server.level.ServerPlayer player) {
-                return ShadowHandler.exchangeValidated(player)
+            @Override public net.minecraft.world.entity.Entity exchangeTarget(net.minecraft.server.level.ServerPlayer player) {
+                return ShadowHandler.exchangeTarget(player);
+            }
+
+            @Override public AbilityResult exchange(net.minecraft.server.level.ServerPlayer player,
+                                                    net.minecraft.world.entity.Entity preparedTarget) {
+                return ShadowHandler.exchangeValidated(player, preparedTarget)
                         ? AbilityResult.success("Exchanged positions with an owned shadow.")
                         : AbilityResult.failure("No safe owned shadow destination is available.");
             }
@@ -31,6 +37,14 @@ public final class IntegrationBootstrap {
                 QuestApi.onShadowSummoned(player, "any");
                 return AbilityResult.success("An owned shadow answered the summons.");
             }
+        });
+
+        AbilityIntegrationHooks.installQuestListener((player, definition, manaSpent) -> {
+            String questId = definition.id().startsWith("rulers_authority")
+                    ? "rulers_authority" : definition.id();
+            QuestApi.onAbilityUsed(player, questId);
+            QuestApi.onManaSpent(player, manaSpent);
+            QuestHandler.onAbilityUse(player);
         });
 
         DungeonHooks.registerRewardHook((player, session, template) ->

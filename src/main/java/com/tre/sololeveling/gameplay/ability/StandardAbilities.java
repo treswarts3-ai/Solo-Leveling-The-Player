@@ -52,6 +52,7 @@ public final class StandardAbilities {
                 .register(new AuthorityAbility("rulers_authority_push", AuthorityMode.PUSH, 35, 80, 22.0D, false))
                 .register(new AuthorityAbility("rulers_authority_hold", AuthorityMode.HOLD, 45, 160, 20.0D, false))
                 .register(new AuthorityAbility("rulers_authority_throw", AuthorityMode.THROW, 30, 80, 22.0D, false))
+                .register(new AuthorityAbility("rulers_authority_object", AuthorityMode.OBJECT, 25, 60, 24.0D, false))
                 .register(new AuthorityAbility("rulers_authority_dash", AuthorityMode.DASH, 25, 100, 0.0D, false))
                 .register(new AuthorityAbility("rulers_authority_flight", AuthorityMode.FLIGHT, 80, 600, 0.0D, false))
                 .register(new EnhancedSensesAbility())
@@ -84,6 +85,21 @@ public final class StandardAbilities {
         return new AbilityDefinition(id, name, description, category, unlock, mana, cooldown, range, scaling);
     }
 
+    private static AbilityDefinition spec(String id, String name, String description, String category,
+                                          AbilityUnlock unlock, int mana, int cooldown, double range,
+                                          AbilityScaling scaling, AbilityCastProfile castProfile) {
+        return new AbilityDefinition(id, name, description, category, unlock, mana, cooldown, range,
+                scaling, castProfile);
+    }
+
+    private static AbilityCastProfile profile(String role, String animation, int startup, int active,
+                                              int recovery, int failureRecovery, boolean damageInterrupt,
+                                              boolean attackInterrupt, double movementTolerance,
+                                              String progression) {
+        return new AbilityCastProfile(role, animation, startup, active, recovery, failureRecovery,
+                damageInterrupt, attackInterrupt, movementTolerance, progression);
+    }
+
     private static final class DashAbility extends BaseAbility {
         private DashAbility() {
             super(spec("dash", "Dash", "A short agility-scaled burst in the facing direction.", "movement",
@@ -107,7 +123,10 @@ public final class StandardAbilities {
         private QuicksilverAbility() {
             super(spec("quicksilver", "Quicksilver", "Explode into a controlled burst and leave a short speed trail.", "movement",
                     AbilityUnlock.skillOrLevel("quicksilver", 15), 24, 220, 0.0D,
-                    new AbilityScaling(0, 0.02D, 0, 0, 0)));
+                    new AbilityScaling(0, 0.02D, 0, 0, 0),
+                    profile("High-speed repositioning and momentum setup", "ability.quicksilver.accelerate",
+                            3, 120, 6, 4, false, false, -1.0D,
+                            "Mastery improves efficiency and power; Phantom Step or Flash Execution evolution")));
         }
 
         @Override public int manaCost(ServerPlayer player) {
@@ -122,12 +141,30 @@ public final class StandardAbilities {
                     : definition().cooldownTicks();
         }
 
+        @Override public Entity selectTarget(ServerPlayer player) {
+            return "flash_execution".equals(HunterData.mutable(player).getString("evolution_quicksilver"))
+                    ? AbilityTargeting.livingRayTarget(player, AbilityMastery.adjustedRange(player, definition()) + 10.0D)
+                    : null;
+        }
+
+        @Override public boolean requiresTarget(ServerPlayer player) {
+            return "flash_execution".equals(HunterData.mutable(player).getString("evolution_quicksilver"));
+        }
+
+        @Override public AbilityResult validateStart(AbilityContext context) {
+            if (context.livingTarget() == null) return AbilityResult.success("");
+            if (!AbilityTargeting.isValidTarget(context.player(), context.livingTarget()))
+                return AbilityResult.failure("Flash Execution's target became invalid.");
+            return AbilityEffects.safeNearTarget(context.player(), context.livingTarget(), 1.45D) == null
+                    ? AbilityResult.failure("Flash Execution has no safe arrival position.")
+                    : AbilityResult.success("");
+        }
+
         @Override public AbilityResult activate(AbilityContext context) {
             ServerPlayer player = context.player();
             String evolution = HunterData.mutable(player).getString("evolution_quicksilver");
-            LivingEntity executionTarget = null;
+            LivingEntity executionTarget = context.livingTarget();
             if (evolution.equals("flash_execution")) {
-                executionTarget = AbilityTargeting.livingRayTarget(player, 10.0D);
                 if (executionTarget == null) return AbilityResult.failure("Flash Execution requires a visible target within 10 blocks.");
                 Vec3 destination = AbilityEffects.safeNearTarget(player, executionTarget, 1.45D);
                 if (destination == null || !AbilityEffects.moveIfClear(player, destination)) {
@@ -141,7 +178,7 @@ public final class StandardAbilities {
             player.addEffect(new MobEffectInstance(MobEffects.JUMP, duration, Math.min(1, amplifier / 2), false, false, true));
             Vec3 look = player.getLookAngle().normalize();
             double burst = Math.min(1.95D, 1.15D + agility * 0.006D);
-            AbilityEffects.setClampedVelocity(player,
+            AbilityEffects.setSafeClampedVelocity(player,
                     new Vec3(look.x * burst, Math.max(0.08D, look.y * 0.45D + 0.08D), look.z * burst),
                     1.95D, 0.45D);
             player.fallDistance = 0.0F;
@@ -176,6 +213,12 @@ public final class StandardAbilities {
                 AbilityEffects.particles(player.serverLevel(), player.position().add(0, 0.1D, 0),
                         ParticleTypes.CLOUD, 2, 0.10D);
             }
+            Vec3 velocity = player.getDeltaMovement();
+            Vec3 desired = player.getLookAngle().normalize().scale(Math.min(1.95D,
+                    Math.max(0.35D, velocity.horizontalDistance())));
+            Vec3 controlled = new Vec3(velocity.x * 0.72D + desired.x * 0.28D, velocity.y,
+                    velocity.z * 0.72D + desired.z * 0.28D);
+            AbilityEffects.setSafeClampedVelocity(player, controlled, 1.95D, 0.55D);
         }
 
         @Override public void cancel(ServerPlayer player) {
@@ -227,13 +270,33 @@ public final class StandardAbilities {
         private MutilationAbility() {
             super(spec("mutilation", "Mutilation", "Lock into dagger range and execute four rapid precision cuts.", "combat",
                     AbilityUnlock.skillOrLevel("mutilation", 20), 48, 180, 7.0D,
-                    new AbilityScaling(0.24D, 0.16D, 0, 0, 0.04D)));
+                    new AbilityScaling(0.24D, 0.16D, 0, 0, 0.04D),
+                    profile("Single-target four-hit dagger execution", "ability.mutilation.four_cut",
+                            5, 12, 8, 6, true, true, 0.75D,
+                            "Mastery unlocks a final cone cut and stronger combo payoff")));
+        }
+
+        @Override public Entity selectTarget(ServerPlayer player) {
+            return AbilityTargeting.livingRayTarget(player, AbilityMastery.adjustedRange(player, definition()));
+        }
+
+        @Override public boolean requiresTarget(ServerPlayer player) { return true; }
+
+        @Override public AbilityResult validateStart(AbilityContext context) {
+            if (!AbilityEffects.hasDagger(context.player())) return AbilityResult.failure("Mutilation requires a dagger.");
+            LivingEntity target = context.livingTarget();
+            if (target == null || !AbilityTargeting.isValidTarget(context.player(), target))
+                return AbilityResult.failure("No valid Mutilation target.");
+            if (context.player().distanceToSqr(target) <= 16.0D) return AbilityResult.success("");
+            Vec3 destination = AbilityEffects.safeNearTarget(context.player(), target, 1.55D);
+            return destination != null && AbilityEffects.isClearPath(context.player(), destination)
+                    ? AbilityResult.success("") : AbilityResult.failure("No safe dagger position is available.");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
             ServerPlayer player = context.player();
             if (!AbilityEffects.hasDagger(player)) return AbilityResult.failure("Mutilation requires a dagger.");
-            LivingEntity target = AbilityTargeting.livingRayTarget(player, definition().maximumRange());
+            LivingEntity target = context.livingTarget();
             if (target == null) return AbilityResult.failure("No visible Mutilation target within 7 blocks.");
             if (player.distanceToSqr(target) > 4.0D * 4.0D) {
                 Vec3 destination = AbilityEffects.safeNearTarget(player, target, 1.55D);
@@ -245,7 +308,10 @@ public final class StandardAbilities {
             tag.putString(MUTILATION_TARGET, target.getUUID().toString());
             tag.putInt(MUTILATION_HITS, 4);
             tag.putLong(MUTILATION_NEXT, player.level().getGameTime());
-            tag.putFloat(MUTILATION_DAMAGE, definition().scaling().apply(player, 3.2D));
+            double combo = AbilityCombos.follows(player, "quicksilver", 50L)
+                    || AbilityCombos.follows(player, "dagger_rush", 50L) ? 1.18D : 1.0D;
+            tag.putFloat(MUTILATION_DAMAGE, (float)(definition().scaling().apply(player, 3.2D)
+                    * AbilityMastery.powerMultiplier(player, definition().id()) * combo));
             tag.putLong(MUTILATION_LOCK, player.level().getGameTime() + 14L);
             player.setDeltaMovement(Vec3.ZERO);
             context.level().playSound(null, player.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP,
@@ -285,6 +351,12 @@ public final class StandardAbilities {
             remaining--;
             if (remaining <= 0 || !target.isAlive()) {
                 AbilityEffects.particles(player.serverLevel(), target.position().add(0, 1, 0), ParticleTypes.CRIT, 24, 0.55D);
+                if (AbilityMastery.level(player, definition().id()) >= 2) {
+                    for (LivingEntity nearby : AbilityTargeting.nearbyVisible(player, 4.5D,
+                            entity -> entity != target && AbilityTargeting.inFrontCone(player, entity, 0.05D))) {
+                        AbilityEffects.dealAbilityDamage(player, nearby, damage * 0.65F, "mutilation_finisher");
+                    }
+                }
                 clearMutilation(player);
             } else {
                 tag.putInt(MUTILATION_HITS, remaining);
@@ -295,34 +367,76 @@ public final class StandardAbilities {
         @Override public void cancel(ServerPlayer player) {
             clearMutilation(player);
         }
+
+        @Override public void onInterrupted(ServerPlayer player, String reason) {
+            if (HunterData.mutable(player).getInt(MUTILATION_HITS) > 0) {
+                clearMutilation(player);
+                player.displayClientMessage(Component.literal("Mutilation sequence interrupted by " + reason + "."), true);
+            }
+        }
     }
 
     private static final class DaggerRushAbility extends BaseAbility {
         private DaggerRushAbility() {
             super(spec("dagger_rush", "Dagger Rush", "Rush to a visible target and strike on arrival.", "combat",
                     AbilityUnlock.skillOrLevel("dagger_rush", 25), 58, 260, 14.0D,
-                    new AbilityScaling(0.28D, 0.22D, 0, 0, 0.04D)));
+                    new AbilityScaling(0.28D, 0.22D, 0, 0, 0.04D),
+                    profile("Targeted gap closer with arrival slash", "ability.dagger_rush.dash_slash",
+                            6, 2, 10, 8, true, true, 1.0D,
+                            "Mastery improves reach and grants a kill reset at tier three")));
+        }
+
+        @Override public Entity selectTarget(ServerPlayer player) {
+            return AbilityTargeting.livingRayTarget(player, AbilityMastery.adjustedRange(player, definition()));
+        }
+
+        @Override public boolean requiresTarget(ServerPlayer player) { return true; }
+
+        @Override public AbilityResult validateStart(AbilityContext context) {
+            if (!AbilityEffects.hasDagger(context.player())) return AbilityResult.failure("Dagger Rush requires a dagger.");
+            LivingEntity target = context.livingTarget();
+            if (target == null || !AbilityTargeting.isValidTarget(context.player(), target))
+                return AbilityResult.failure("No valid Dagger Rush target.");
+            Vec3 destination = AbilityEffects.safeNearTarget(context.player(), target, 1.45D);
+            if (destination == null) return AbilityResult.failure("The target has no safe arrival position.");
+            return AbilityEffects.isClearPath(context.player(), destination)
+                    ? AbilityResult.success("") : AbilityResult.failure("Dagger Rush path is obstructed.");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
             ServerPlayer player = context.player();
             if (!AbilityEffects.hasDagger(player)) return AbilityResult.failure("Dagger Rush requires a dagger.");
-            LivingEntity target = AbilityTargeting.livingRayTarget(player, definition().maximumRange());
+            LivingEntity target = context.livingTarget();
             if (target == null) return AbilityResult.failure("No visible target within 14 blocks.");
             Vec3 destination = AbilityEffects.safeNearTarget(player, target, 1.45D);
             if (destination == null) return AbilityResult.failure("The target has no safe arrival position.");
             Vec3 origin = player.position();
-            if (!AbilityEffects.moveIfClear(player, destination)) return AbilityResult.failure("Dagger Rush path is obstructed.");
+            if (!AbilityEffects.isClearPath(player, destination) || !AbilityEffects.moveIfClear(player, destination))
+                return AbilityResult.failure("Dagger Rush path is obstructed.");
             AbilityEffects.particles(context.level(), origin.add(0, 0.8D, 0), ParticleTypes.REVERSE_PORTAL, 22, 0.45D);
             AbilityEffects.particles(context.level(), destination.add(0, 0.8D, 0), ParticleTypes.SWEEP_ATTACK, 12, 0.45D);
-            float damage = definition().scaling().apply(player, AbilityEffects.isBoss(target) ? 5.0D : 7.0D);
+            double combo = AbilityCombos.follows(player, "quicksilver", 50L) ? 1.20D : 1.0D;
+            float damage = (float)(definition().scaling().apply(player, AbilityEffects.isBoss(target) ? 5.0D : 7.0D)
+                    * AbilityMastery.powerMultiplier(player, definition().id()) * combo);
             if (!AbilityEffects.dealAbilityDamage(player, target, damage, "dagger_rush")) {
                 return AbilityResult.failure("Dagger Rush reached the target but the strike was resisted.");
             }
             player.swing(InteractionHand.MAIN_HAND, true);
             context.level().playSound(null, target.blockPosition(), SoundEvents.PLAYER_ATTACK_STRONG,
                     SoundSource.PLAYERS, 1.0F, 1.25F);
+            if (!target.isAlive() && AbilityMastery.level(player, definition().id()) >= 3) {
+                HunterData.mutable(player).putBoolean("dagger_rush_kill_reset", true);
+            }
             return AbilityResult.success("Gap closed and target struck.");
+        }
+
+        @Override public int cooldownTicks(ServerPlayer player) {
+            CompoundTag tag = HunterData.mutable(player);
+            if (tag.getBoolean("dagger_rush_kill_reset")) {
+                tag.putBoolean("dagger_rush_kill_reset", false);
+                return 0;
+            }
+            return definition().cooldownTicks();
         }
     }
 
@@ -398,7 +512,10 @@ public final class StandardAbilities {
         private StealthAbility() {
             super(spec("stealth", "Stealth", "Fade from sight and reduce hostile detection for ten seconds.", "utility",
                     AbilityUnlock.skillOrLevel("stealth", 5), 25, 320, 0.0D,
-                    new AbilityScaling(0, 0.01D, 0, 0.01D, 0.01D)));
+                    new AbilityScaling(0, 0.01D, 0, 0.01D, 0.01D),
+                    profile("Infiltration stance with a backstab opener", "ability.stealth.fade",
+                            8, 200, 6, 5, true, true, 2.0D,
+                            "Mastery improves efficiency and backstab output")));
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -434,7 +551,7 @@ public final class StandardAbilities {
         }
     }
 
-    private enum AuthorityMode { PULL, PUSH, HOLD, THROW, DASH, FLIGHT }
+    private enum AuthorityMode { PULL, PUSH, HOLD, THROW, OBJECT, DASH, FLIGHT }
 
     private static final class AuthorityAbility extends BaseAbility {
         private final AuthorityMode mode;
@@ -443,9 +560,38 @@ public final class StandardAbilities {
         private AuthorityAbility(String id, AuthorityMode mode, int mana, int cooldown, double range, boolean stateOwner) {
             super(spec(id, authorityName(mode), "Server-controlled telekinetic " + mode.name().toLowerCase() + ".", "utility",
                     AbilityUnlock.skillOrLevel("rulers_authority", 30), mana, cooldown, range,
-                    new AbilityScaling(0.02D, 0.005D, 0, 0.01D, 0.01D)));
+                    new AbilityScaling(0.02D, 0.005D, 0, 0.01D, 0.01D),
+                    profile("Weight-aware telekinetic control: " + mode.name().toLowerCase(),
+                            "ability.rulers_authority." + mode.name().toLowerCase(), 4, 6, 6, 4,
+                            true, true, 2.0D, "Mastery improves force, range, efficiency, and control")));
             this.mode = mode;
             this.stateOwner = stateOwner;
+        }
+
+        @Override public Entity selectTarget(ServerPlayer player) {
+            if (mode == AuthorityMode.DASH || mode == AuthorityMode.FLIGHT) return null;
+            if (mode == AuthorityMode.THROW) {
+                Entity held = heldEntity(player);
+                if (held != null) return held;
+            }
+            return AbilityTargeting.rayTarget(player, AbilityMastery.adjustedRange(player, definition()));
+        }
+
+        @Override public boolean requiresTarget(ServerPlayer player) {
+            return mode != AuthorityMode.DASH && mode != AuthorityMode.FLIGHT;
+        }
+
+        @Override public AbilityResult validateStart(AbilityContext context) {
+            Entity target = context.preparedTarget();
+            if (requiresTarget(context.player()) && target == null)
+                return AbilityResult.failure("No visible Ruler's Authority target.");
+            if (target != null && !AbilityTargeting.isValidTarget(context.player(), target))
+                return AbilityResult.failure("Ruler's Authority target became invalid.");
+            if (mode == AuthorityMode.HOLD && !(target instanceof LivingEntity))
+                return AbilityResult.failure("Hold requires a living target.");
+            if (mode == AuthorityMode.OBJECT && !(target instanceof ItemEntity))
+                return AbilityResult.failure("Object control requires a dropped item target.");
+            return AbilityResult.success("");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -454,6 +600,7 @@ public final class StandardAbilities {
                 case PUSH -> impulse(context, false);
                 case HOLD -> hold(context);
                 case THROW -> throwTarget(context);
+                case OBJECT -> objectControl(context);
                 case DASH -> authorityDash(context);
                 case FLIGHT -> flight(context);
             };
@@ -473,12 +620,13 @@ public final class StandardAbilities {
 
         private AbilityResult impulse(AbilityContext context, boolean pull) {
             ServerPlayer player = context.player();
-            Entity target = AbilityTargeting.rayTarget(player, definition().maximumRange());
+            Entity target = context.preparedTarget();
             if (target == null) return AbilityResult.failure("No visible Ruler's Authority target.");
             Vec3 direction = player.getLookAngle().normalize();
             double baseForce = Math.min(2.5D, 0.75D + HunterData.getStat(player, "strength") * 0.015D
                     + HunterData.getStat(player, "intelligence") * 0.004D);
-            double resistance = AbilityEffects.isBoss(target) ? 0.25D : 1.0D;
+            AbilityTargeting.WeightClass weight = AbilityTargeting.weightClass(target);
+            double resistance = weight.forceMultiplier();
             double force = baseForce * resistance;
             Vec3 movement;
             if (target instanceof ItemEntity item) {
@@ -497,12 +645,13 @@ public final class StandardAbilities {
             context.level().playSound(null, target.blockPosition(), SoundEvents.EVOKER_CAST_SPELL,
                     SoundSource.PLAYERS, 0.75F, pull ? 0.85F : 1.25F);
             return AbilityResult.success("Ruler's Authority " + mode.name().toLowerCase()
-                    + (resistance < 1.0D ? " partially moved the resistant target." : " succeeded."));
+                    + (weight == AbilityTargeting.WeightClass.LIGHT ? " succeeded."
+                    : " applied reduced force to a " + weight.name().toLowerCase() + " target."));
         }
 
         private AbilityResult hold(AbilityContext context) {
             ServerPlayer player = context.player();
-            Entity target = AbilityTargeting.rayTarget(player, definition().maximumRange());
+            Entity target = context.preparedTarget();
             if (!(target instanceof LivingEntity living)) return AbilityResult.failure("No valid living target to hold.");
             if (AbilityEffects.isBoss(target)) {
                 living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 60, 1));
@@ -522,12 +671,11 @@ public final class StandardAbilities {
 
         private AbilityResult throwTarget(AbilityContext context) {
             ServerPlayer player = context.player();
-            Entity target = heldEntity(player);
-            if (target == null) target = AbilityTargeting.rayTarget(player, definition().maximumRange());
+            Entity target = context.preparedTarget();
             if (target == null) return AbilityResult.failure("No held or visible entity to throw.");
             boolean resistant = AbilityEffects.isBoss(target);
-            double forceValue = resistant ? 0.7D : Math.min(2.8D,
-                    1.7D + HunterData.getStat(player, "strength") * 0.01D);
+            double forceValue = Math.min(2.8D, 1.7D + HunterData.getStat(player, "strength") * 0.01D)
+                    * AbilityTargeting.weightClass(target).forceMultiplier();
             Vec3 force = player.getLookAngle().normalize().scale(forceValue).add(0.0D, resistant ? 0.08D : 0.22D, 0.0D);
             if (target instanceof LivingEntity living) {
                 AbilityEffects.dealAbilityDamage(player, living,
@@ -537,6 +685,18 @@ public final class StandardAbilities {
             if (target == heldEntity(player)) releaseHeld(player, false);
             AbilityEffects.setClampedVelocity(target, force, 2.8D, 0.9D);
             return AbilityResult.success(resistant ? "The target resisted most of the throw." : "Target thrown.");
+        }
+
+        private AbilityResult objectControl(AbilityContext context) {
+            if (!(context.preparedTarget() instanceof ItemEntity item))
+                return AbilityResult.failure("Object control requires a dropped item target.");
+            Vec3 destination = context.player().getEyePosition()
+                    .add(context.player().getLookAngle().normalize().scale(3.0D));
+            Vec3 velocity = destination.subtract(item.position()).scale(0.35D);
+            AbilityEffects.setClampedVelocity(item, velocity, 1.4D, 0.7D);
+            item.setPickUpDelay(0);
+            AbilityEffects.particles(context.level(), item.position(), ParticleTypes.ENCHANT, 18, 0.28D);
+            return AbilityResult.success("Object drawn into a controlled orbit.");
         }
 
         private AbilityResult authorityDash(AbilityContext context) {
@@ -587,7 +747,10 @@ public final class StandardAbilities {
         private MonarchDomainAbility() {
             super(spec("monarch_domain", "Monarch's Domain", "Toggle the mana-draining domain used by the shadow system.", "monarch",
                     AbilityUnlock.skill("monarch_domain"), 30, 100, 0.0D,
-                    new AbilityScaling(0, 0, 0, 0.03D, 0.02D)));
+                    new AbilityScaling(0, 0, 0, 0.03D, 0.02D),
+                    profile("Area stance that empowers nearby owned shadows", "ability.monarch_domain.expand",
+                            8, 20, 8, 6, false, false, 2.0D,
+                            "Mastery expands the boundary and shadow empowerment")));
         }
 
         @Override public int manaCost(ServerPlayer player) {
@@ -607,7 +770,7 @@ public final class StandardAbilities {
         @Override public void tick(ServerPlayer player) {
             if (HunterData.domainActive(player) && player.tickCount % 10 == 0) {
                 AbilityEffects.ring(player.serverLevel(), player.position().add(0, 0.12D, 0),
-                        ParticleTypes.REVERSE_PORTAL, 4.0D, 24);
+                        ParticleTypes.REVERSE_PORTAL, AbilityMastery.domainRadius(player), 32);
             }
         }
 
@@ -627,13 +790,32 @@ public final class StandardAbilities {
         private ShadowHookAbility(String id, String name, int mana, int cooldown, ShadowHook hook) {
             super(spec(id, name, "Validated integration point for the shadow system.", "monarch",
                     AbilityUnlock.skill(id.equals("shadow_summoning") ? "shadow_preservation" : id),
-                    mana, cooldown, 24.0D, AbilityScaling.NONE));
+                    mana, cooldown, 24.0D, AbilityScaling.NONE,
+                    hook == ShadowHook.EXCHANGE
+                            ? profile("Tactical relocation to a selected owned shadow", "ability.shadow_exchange.transition",
+                            10, 4, 10, 8, true, true, 1.5D,
+                            "Mastery improves mana, cooldown, and tactical reach")
+                            : AbilityCastProfile.INSTANT));
             this.hook = hook;
+        }
+
+        @Override public Entity selectTarget(ServerPlayer player) {
+            return hook == ShadowHook.EXCHANGE ? AbilityIntegrationHooks.shadows().exchangeTarget(player) : null;
+        }
+
+        @Override public boolean requiresTarget(ServerPlayer player) { return hook == ShadowHook.EXCHANGE; }
+
+        @Override public AbilityResult validateStart(AbilityContext context) {
+            if (hook != ShadowHook.EXCHANGE) return AbilityResult.success("");
+            Entity target = context.preparedTarget();
+            return target != null && target.level() == context.player().level()
+                    ? AbilityResult.success("")
+                    : AbilityResult.failure("No safe same-dimension shadow destination is available.");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
             return switch (hook) {
-                case EXCHANGE -> AbilityIntegrationHooks.shadows().exchange(context.player());
+                case EXCHANGE -> AbilityIntegrationHooks.shadows().exchange(context.player(), context.preparedTarget());
                 case EXTRACTION -> AbilityIntegrationHooks.shadows().extract(context.player());
                 case SUMMONING -> AbilityIntegrationHooks.shadows().summon(context.player());
             };
@@ -644,7 +826,10 @@ public final class StandardAbilities {
         private DragonsFearAbility() {
             super(spec("dragons_fear", "Dragon's Fear", "Release an expanding terror wave that disrupts hostile enemies.", "combat",
                     AbilityUnlock.skillOrLevel("dragons_fear", 35), 110, 800, 18.0D,
-                    new AbilityScaling(0, 0, 0, 0.03D, 0.03D)));
+                    new AbilityScaling(0, 0, 0, 0.03D, 0.03D),
+                    profile("Expanding crowd-control wave with boss resistance", "ability.dragons_fear.roar",
+                            8, 12, 16, 10, true, true, 1.5D,
+                            "Mastery improves radius and duration while repeated fear diminishes")));
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -652,7 +837,7 @@ public final class StandardAbilities {
             long cast = player.level().getGameTime();
             CompoundTag tag = HunterData.mutable(player);
             tag.putLong(FEAR_CAST, cast);
-            tag.putLong(FEAR_UNTIL, cast + 12L);
+            tag.putLong(FEAR_UNTIL, cast + 12L + AbilityMastery.level(player, definition().id()) * 2L);
             context.level().playSound(null, player.blockPosition(), SoundEvents.ENDER_DRAGON_GROWL,
                     SoundSource.PLAYERS, 1.7F, 0.72F);
             AbilityEffects.particles(context.level(), player.position().add(0, 1.0D, 0), ParticleTypes.SONIC_BOOM, 4, 0.35D);
@@ -670,7 +855,8 @@ public final class StandardAbilities {
                 return;
             }
             if ((now - cast) % 2L != 0L) return;
-            double radius = Math.min(definition().maximumRange(), 2.0D + (now - cast) * 1.5D);
+            double radius = Math.min(AbilityMastery.adjustedRange(player, definition()),
+                    2.0D + (now - cast) * 1.5D);
             AbilityEffects.ring(player.serverLevel(), player.position().add(0, 0.2D, 0),
                     ParticleTypes.DRAGON_BREATH, radius, 36);
             for (LivingEntity living : AbilityTargeting.nearbyVisible(player, radius, entity -> entity instanceof Monster)) {
@@ -691,8 +877,21 @@ public final class StandardAbilities {
 
     private static void applyFear(ServerPlayer player, LivingEntity living) {
         boolean boss = AbilityEffects.isBoss(living);
-        living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, boss ? 80 : 140, boss ? 0 : 2));
-        living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, boss ? 50 : 100, boss ? 0 : 2));
+        CompoundTag data = living.getPersistentData();
+        long now = living.level().getGameTime();
+        int repeats = data.hasUUID("sl_fear_repeat_owner")
+                && player.getUUID().equals(data.getUUID("sl_fear_repeat_owner"))
+                && now - data.getLong("sl_fear_repeat_time") <= 20L * 30L
+                ? Math.min(3, data.getInt("sl_fear_repeats") + 1) : 0;
+        data.putUUID("sl_fear_repeat_owner", player.getUUID());
+        data.putLong("sl_fear_repeat_time", now);
+        data.putInt("sl_fear_repeats", repeats);
+        double diminishing = Math.max(0.35D, 1.0D - repeats * 0.22D);
+        double mastery = 1.0D + AbilityMastery.level(player, "dragons_fear") * 0.10D;
+        int weakness = (int)Math.ceil((boss ? 80 : 140) * diminishing * mastery);
+        int slow = (int)Math.ceil((boss ? 50 : 100) * diminishing * mastery);
+        living.addEffect(new MobEffectInstance(MobEffects.WEAKNESS, weakness, boss ? 0 : 2));
+        living.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, slow, boss ? 0 : 2));
         if (!boss && living instanceof Mob mob) {
             mob.setTarget(null);
             Vec3 away = living.position().subtract(player.position());

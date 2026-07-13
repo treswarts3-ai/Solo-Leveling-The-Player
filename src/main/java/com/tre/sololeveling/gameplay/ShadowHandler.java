@@ -96,16 +96,40 @@ public final class ShadowHandler {
         return exchange(player, false);
     }
 
-    private static boolean exchange(ServerPlayer player, boolean manageCost) {
-        if (manageCost && (!HunterData.hasSkill(player, "shadow_exchange") || !HunterData.cooldownReady(player, "shadow_exchange"))) return false;
+    public static boolean exchangeValidated(ServerPlayer player, Entity preparedTarget) {
+        return exchangeWith(player, preparedTarget, false);
+    }
+
+    /** Returns the deterministic same-dimension destination used for cast preview and validation. */
+    public static Entity exchangeTarget(ServerPlayer player) {
         for (UUID id : ShadowSummoningService.activeIds(player)) {
             Entity entity = ShadowSummoningService.findEntity(player.getServer(), id);
             if (entity == null || entity.level() != player.level() || !entity.isAlive()
                     || !ShadowSummoningService.isOwnedBy(entity, player.getUUID())) continue;
+            if (safeDestination(player.serverLevel(), player, entity.getX(), entity.getY(), entity.getZ())
+                    && safeDestination(player.serverLevel(), entity, player.getX(), player.getY(), player.getZ())) {
+                return entity;
+            }
+        }
+        return null;
+    }
+
+    private static boolean exchange(ServerPlayer player, boolean manageCost) {
+        if (manageCost && (!HunterData.hasSkill(player, "shadow_exchange") || !HunterData.cooldownReady(player, "shadow_exchange"))) return false;
+        return exchangeWith(player, exchangeTarget(player), manageCost);
+    }
+
+    private static boolean exchangeWith(ServerPlayer player, Entity entity, boolean manageCost) {
+        if (entity != null && entity.level() == player.level() && entity.isAlive()
+                && ShadowSummoningService.isOwnedBy(entity, player.getUUID())) {
             double px = player.getX(), py = player.getY(), pz = player.getZ();
             double ex = entity.getX(), ey = entity.getY(), ez = entity.getZ();
             if (!safeDestination(player.serverLevel(), player, ex, ey, ez)
-                    || !safeDestination(player.serverLevel(), entity, px, py, pz)) continue;
+                    || !safeDestination(player.serverLevel(), entity, px, py, pz)) {
+                player.sendSystemMessage(Component.literal("[SYSTEM] Shadow Exchange destination became obstructed.")
+                        .withStyle(ChatFormatting.RED));
+                return false;
+            }
             if (manageCost && !HunterData.spendMana(player, 50)) return false;
             player.teleportTo(ex, ey, ez);
             entity.teleportTo(px, py, pz);
