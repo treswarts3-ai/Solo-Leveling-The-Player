@@ -79,3 +79,7 @@ Combat: `dagger_mastery`, `mutilation`, `bloodlust`, `area_slash`, `dragons_fear
 Utility: `stealth`, `rulers_authority` and its mode IDs, `enhanced_senses`.
 
 Monarch: `monarch_domain`, `shadow_exchange`, `shadow_extraction`, `shadow_summoning`.
+
+## Ability evolution
+
+Quicksilver reads the server-owned `evolution_quicksilver` choice. `phantom_step` lowers mana and cooldown; `flash_execution` adds validated targeting, safe-position movement, and a finishing strike with higher cost and cooldown. Evolution selection is handled by progression authority and is not accepted from arbitrary ability packet data.
