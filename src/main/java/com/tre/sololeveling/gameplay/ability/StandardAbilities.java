@@ -152,12 +152,12 @@ public final class StandardAbilities {
         }
 
         @Override public AbilityResult validateStart(AbilityContext context) {
-            if (context.livingTarget() == null) return AbilityResult.success();
+            if (context.livingTarget() == null) return AbilityResult.success("");
             if (!AbilityTargeting.isValidTarget(context.player(), context.livingTarget()))
                 return AbilityResult.failure("Flash Execution's target became invalid.");
             return AbilityEffects.safeNearTarget(context.player(), context.livingTarget(), 1.45D) == null
                     ? AbilityResult.failure("Flash Execution has no safe arrival position.")
-                    : AbilityResult.success();
+                    : AbilityResult.success("");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -287,10 +287,10 @@ public final class StandardAbilities {
             LivingEntity target = context.livingTarget();
             if (target == null || !AbilityTargeting.isValidTarget(context.player(), target))
                 return AbilityResult.failure("No valid Mutilation target.");
-            if (context.player().distanceToSqr(target) <= 16.0D) return AbilityResult.success();
+            if (context.player().distanceToSqr(target) <= 16.0D) return AbilityResult.success("");
             Vec3 destination = AbilityEffects.safeNearTarget(context.player(), target, 1.55D);
             return destination != null && AbilityEffects.isClearPath(context.player(), destination)
-                    ? AbilityResult.success() : AbilityResult.failure("No safe dagger position is available.");
+                    ? AbilityResult.success("") : AbilityResult.failure("No safe dagger position is available.");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -400,7 +400,7 @@ public final class StandardAbilities {
             Vec3 destination = AbilityEffects.safeNearTarget(context.player(), target, 1.45D);
             if (destination == null) return AbilityResult.failure("The target has no safe arrival position.");
             return AbilityEffects.isClearPath(context.player(), destination)
-                    ? AbilityResult.success() : AbilityResult.failure("Dagger Rush path is obstructed.");
+                    ? AbilityResult.success("") : AbilityResult.failure("Dagger Rush path is obstructed.");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -591,7 +591,7 @@ public final class StandardAbilities {
                 return AbilityResult.failure("Hold requires a living target.");
             if (mode == AuthorityMode.OBJECT && !(target instanceof ItemEntity))
                 return AbilityResult.failure("Object control requires a dropped item target.");
-            return AbilityResult.success();
+            return AbilityResult.success("");
         }
 
         @Override public AbilityResult activate(AbilityContext context) {
@@ -806,10 +806,10 @@ public final class StandardAbilities {
         @Override public boolean requiresTarget(ServerPlayer player) { return hook == ShadowHook.EXCHANGE; }
 
         @Override public AbilityResult validateStart(AbilityContext context) {
-            if (hook != ShadowHook.EXCHANGE) return AbilityResult.success();
+            if (hook != ShadowHook.EXCHANGE) return AbilityResult.success("");
             Entity target = context.preparedTarget();
             return target != null && target.level() == context.player().level()
-                    ? AbilityResult.success()
+                    ? AbilityResult.success("")
                     : AbilityResult.failure("No safe same-dimension shadow destination is available.");
         }
 
