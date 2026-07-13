@@ -2,6 +2,12 @@
 
 All notable changes to Solo Leveling: The Player are documented here.
 
+## [Unreleased]
+
+### Changed
+
+- Completed Phase 3 runtime hardening with Hunter schema-v5 repair/clamping, a guarded ten-state dungeon lifecycle, isolated malformed-record recovery, checked return points, and stricter server action validation.
+
 ## [1.0.0] - 2026-07-10
 
 ### Added
