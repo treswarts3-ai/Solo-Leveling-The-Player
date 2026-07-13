@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class DungeonSession {
+    private static final int DATA_VERSION = 2;
     private final UUID sessionId;
     private final String gateId;
     private final String templateId;
@@ -105,11 +106,41 @@ public final class DungeonSession {
     public UUID bossId() { return bossId; }
     public String failureReason() { return failureReason; }
     public boolean contains(UUID playerId) { return members.contains(playerId); }
-    public boolean isTerminal() { return state == DungeonTypes.SessionState.COMPLETED || state == DungeonTypes.SessionState.FAILED || state == DungeonTypes.SessionState.CLEANUP; }
+    public boolean isTerminal() { return state == DungeonTypes.SessionState.COMPLETED || state == DungeonTypes.SessionState.FAILED
+            || state == DungeonTypes.SessionState.CLEANING || state == DungeonTypes.SessionState.CLOSED; }
     public DungeonTypes.ObjectiveDefinition currentObjective(DungeonTypes.DungeonTemplate template) { return template == null ? null : template.objective(objectiveIndex); }
 
     public void setDungeonLocation(ResourceKey<Level> dimension, BlockPos origin) { dungeonDimension = dimension; arenaOrigin = origin.immutable(); }
-    public void setState(DungeonTypes.SessionState value) { state = value; }
+    public boolean canTransitionTo(DungeonTypes.SessionState next) {
+        if (next == null) return false;
+        if (state == next) return true;
+        if (next == DungeonTypes.SessionState.FAILED || next == DungeonTypes.SessionState.CLEANING) {
+            return state != DungeonTypes.SessionState.CLOSED && state != DungeonTypes.SessionState.CLEANING;
+        }
+        if (next == DungeonTypes.SessionState.COMPLETED) {
+            return state != DungeonTypes.SessionState.COMPLETED && state != DungeonTypes.SessionState.FAILED
+                    && state != DungeonTypes.SessionState.CLEANING && state != DungeonTypes.SessionState.CLOSED;
+        }
+        return switch (state) {
+            case WAITING -> next == DungeonTypes.SessionState.BUILDING;
+            case BUILDING -> next == DungeonTypes.SessionState.READY;
+            case READY -> next == DungeonTypes.SessionState.ACTIVE || next == DungeonTypes.SessionState.BOSS
+                    || next == DungeonTypes.SessionState.REWARD || next == DungeonTypes.SessionState.BUILDING;
+            case ACTIVE -> next == DungeonTypes.SessionState.BOSS || next == DungeonTypes.SessionState.REWARD
+                    || next == DungeonTypes.SessionState.BUILDING;
+            case BOSS -> next == DungeonTypes.SessionState.ACTIVE || next == DungeonTypes.SessionState.REWARD
+                    || next == DungeonTypes.SessionState.BUILDING;
+            case REWARD -> next == DungeonTypes.SessionState.BUILDING;
+            case COMPLETED -> next == DungeonTypes.SessionState.BUILDING;
+            case FAILED -> false;
+            case CLEANING -> next == DungeonTypes.SessionState.CLOSED;
+            case CLOSED -> false;
+        };
+    }
+    public void setState(DungeonTypes.SessionState value) {
+        if (!canTransitionTo(value)) throw new IllegalStateException("Illegal dungeon transition " + state + " -> " + value);
+        state = value;
+    }
     public void setObjectiveProgress(int value) { objectiveProgress = Math.max(0, value); }
     public void addObjectiveProgress(int value) { objectiveProgress = Math.max(0, objectiveProgress + value); }
     public void advanceObjective() { objectiveIndex++; objectiveProgress = 0; encounterSpawned = false; bossId = null; }
@@ -146,6 +177,7 @@ public final class DungeonSession {
 
     public CompoundTag save() {
         CompoundTag tag = new CompoundTag();
+        tag.putInt("data_version", DATA_VERSION);
         tag.putUUID("session_id", sessionId);
         tag.putString("gate_id", gateId);
         tag.putString("template_id", templateId);
@@ -197,7 +229,11 @@ public final class DungeonSession {
         Set<UUID> members = uuidList(tag.getList("members", Tag.TAG_STRING));
         DungeonSession session = new DungeonSession(tag.getUUID("session_id"), tag.getString("gate_id"), tag.getString("template_id"),
                 tag.getUUID("owner"), members, tag.getInt("remaining_ticks"), tag.getInt("arena_slot"));
-        try { session.state = DungeonTypes.SessionState.valueOf(tag.getString("state")); }
+        int persistedVersion = tag.getInt("data_version");
+        String persistedState = tag.getString("state");
+        if (persistedState.equals("CLEANUP")) persistedState = "CLEANING";
+        if (persistedVersion < 2 && persistedState.equals("WAITING")) persistedState = "READY";
+        try { session.state = DungeonTypes.SessionState.valueOf(persistedState); }
         catch (IllegalArgumentException ignored) { session.state = DungeonTypes.SessionState.FAILED; session.failureReason = "Invalid persisted state"; }
         ResourceLocation location = ResourceLocation.tryParse(tag.getString("dimension"));
         if (location == null) location = Level.OVERWORLD.location();
@@ -224,12 +260,19 @@ public final class DungeonSession {
         session.pendingArenaJob = tag.getString("pending_arena_job");
         session.hasMigrationOrigin = tag.getBoolean("has_migration_origin");
         if (session.hasMigrationOrigin) session.migrationOrigin = BlockPos.of(tag.getLong("migration_origin"));
-        session.failureReason = tag.getString("failure_reason");
+        String persistedFailure = tag.getString("failure_reason");
+        if (!persistedFailure.isBlank()) session.failureReason = persistedFailure;
         if (tag.hasUUID("boss_id")) session.bossId = tag.getUUID("boss_id");
         ListTag returns = tag.getList("return_points", Tag.TAG_COMPOUND);
         for (int i = 0; i < returns.size(); i++) {
-            Map.Entry<UUID, DungeonTypes.ReturnPoint> entry = DungeonTypes.ReturnPoint.load(returns.getCompound(i));
-            session.returnPoints.put(entry.getKey(), entry.getValue());
+            try {
+                CompoundTag persistedReturn = returns.getCompound(i);
+                if (!persistedReturn.hasUUID("player")) continue;
+                Map.Entry<UUID, DungeonTypes.ReturnPoint> entry = DungeonTypes.ReturnPoint.load(persistedReturn);
+                if (session.members.contains(entry.getKey())) session.returnPoints.put(entry.getKey(), entry.getValue());
+            } catch (RuntimeException ignored) {
+                // A malformed return point must not discard the rest of a recoverable session.
+            }
         }
         session.trackedEntities.addAll(uuidList(tag.getList("tracked_entities", Tag.TAG_STRING)));
         session.rewardDistributionStarted = tag.getBoolean("reward_granted");
