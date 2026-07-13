@@ -43,6 +43,11 @@ public final class ServerActionHandler {
         }
         if (action.startsWith("GROWTH_CHOICE:")) { ProgressionChoiceHandler.choose(player, action.substring(14)); return; }
         if (action.startsWith("MILESTONE_CHOICE:")) { ProgressionChoiceHandler.chooseMilestone(player, action.substring(17)); return; }
+        if (action.startsWith("EVOLVE:quicksilver:")) {
+            if (allowMutation(player, "evolve_quicksilver", 10L))
+                ProgressionChoiceHandler.chooseAbilityEvolution(player, "quicksilver", action.substring(19));
+            return;
+        }
         if (action.equals("BEGIN_RANK_TRIAL")) { ProgressionChoiceHandler.beginRankTrial(player); return; }
         if (action.startsWith("ABILITY:")) {
             String skill = action.substring(8).toLowerCase(Locale.ROOT);
