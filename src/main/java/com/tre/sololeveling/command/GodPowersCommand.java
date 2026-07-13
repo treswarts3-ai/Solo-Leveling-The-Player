@@ -49,6 +49,7 @@ public final class GodPowersCommand {
         tag.putInt("stat_points", Integer.MAX_VALUE);
         tag.putInt("gold", Integer.MAX_VALUE);
         tag.putInt("shadow_capacity_bonus", 1_000);
+        tag.putInt("skill_evolution_tokens", 99);
         tag.putInt("progression_stage", 5);
         tag.putString("active_main_quest", "completed");
         tag.putString("job", "Shadow Monarch");
@@ -67,7 +68,7 @@ public final class GodPowersCommand {
         HunterData.sync(player);
 
         source.sendSuccess(() -> Component.literal("God powers granted to " + player.getScoreboardName()
-                + ": maximum level and stats, every ability, full mana, and 2,147,483,647 gold.")
+                + ": maximum level and stats, every ability, 99 evolution tokens, full mana, and 2,147,483,647 gold.")
                 .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD), true);
         return 1;
     }

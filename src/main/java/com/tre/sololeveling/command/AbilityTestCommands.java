@@ -54,7 +54,12 @@ public final class AbilityTestCommands {
                                 .executes(ctx -> clearCooldowns(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))))
                 .then(Commands.literal("mana_fill")
                         .then(Commands.argument("player", EntityArgument.player())
-                                .executes(ctx -> fillMana(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))));
+                                .executes(ctx -> fillMana(ctx.getSource(), EntityArgument.getPlayer(ctx, "player")))))
+                .then(Commands.literal("evolution_reset")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.literal("quicksilver")
+                                        .executes(ctx -> resetQuicksilverEvolution(ctx.getSource(),
+                                                EntityArgument.getPlayer(ctx, "player"))))));
     }
 
     private static int list(CommandSourceStack source) {
@@ -113,6 +118,17 @@ public final class AbilityTestCommands {
     private static int fillMana(CommandSourceStack source, ServerPlayer player) {
         HunterData.setMana(player, HunterData.getMaxMana(player));
         source.sendSuccess(() -> Component.literal("Mana filled for " + player.getScoreboardName()), true);
+        return 1;
+    }
+
+    private static int resetQuicksilverEvolution(CommandSourceStack source, ServerPlayer player) {
+        HunterData.mutable(player).putString("evolution_quicksilver", "");
+        HunterData.mutable(player).putInt("skill_evolution_tokens",
+                Math.max(1, HunterData.mutable(player).getInt("skill_evolution_tokens")));
+        HunterData.clearCooldowns(player);
+        HunterData.sync(player);
+        source.sendSuccess(() -> Component.literal("Reset Quicksilver evolution and restored a test token for "
+                + player.getScoreboardName()), true);
         return 1;
     }
 
