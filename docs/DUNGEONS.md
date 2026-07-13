@@ -57,8 +57,10 @@ The four former 89×19×89 maps and their NBT templates are removed from the act
 - Enemy spawn searches are bounded and reject blocked/liquid positions.
 - Session records are created before party teleportation.
 - Reward recipients are persisted before grants run.
+- When every party member disconnects, encounter and objective timers pause for a one-minute reconnect grace period; a remaining party member keeps the run active.
+- Completed sessions retain reconnect reward and safe-return recovery for five minutes before staged cleanup.
 - Death, logout, reconnect, stale-session recovery, and cleanup preserve return safety.
-- Old layout sessions are invalidated through arena layout version 4 and removed safely.
+- Old layout sessions are invalidated through arena layout version 5 and removed safely.
 
 ## Metrics
 
