@@ -40,7 +40,8 @@ public final class DungeonTypes {
         }
     }
 
-    public enum SessionState { BUILDING, WAITING, ACTIVE, COMPLETED, FAILED, CLEANUP }
+    /** Persisted lifecycle states. Keep names stable; old CLEANUP records migrate to CLEANING. */
+    public enum SessionState { WAITING, BUILDING, READY, ACTIVE, BOSS, REWARD, COMPLETED, FAILED, CLEANING, CLOSED }
     public enum ObjectiveType { WAVE, COLLECTION, ELITE, BOSS, REWARD }
     public enum EnemyKind { MELEE, FAST, TANK, RANGED, ELITE }
 
@@ -122,10 +123,18 @@ public final class DungeonTypes {
             tag.putDouble("x", x); tag.putDouble("y", y); tag.putDouble("z", z); tag.putFloat("yaw", yaw); tag.putFloat("pitch", pitch); return tag;
         }
         public static Map.Entry<UUID, ReturnPoint> load(CompoundTag tag) {
+            if (!tag.hasUUID("player")) throw new IllegalArgumentException("Missing return-point player");
             ResourceLocation location = ResourceLocation.tryParse(tag.getString("dimension"));
             if (location == null) location = Level.OVERWORLD.location();
+            double x = tag.getDouble("x");
+            double y = tag.getDouble("y");
+            double z = tag.getDouble("z");
+            if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                    || Math.abs(x) > 30_000_000D || Math.abs(z) > 30_000_000D || Math.abs(y) > 4096D) {
+                throw new IllegalArgumentException("Invalid return-point coordinates");
+            }
             return Map.entry(tag.getUUID("player"), new ReturnPoint(ResourceKey.create(Registries.DIMENSION, location),
-                    tag.getDouble("x"), tag.getDouble("y"), tag.getDouble("z"), tag.getFloat("yaw"), tag.getFloat("pitch")));
+                    x, y, z, tag.getFloat("yaw"), tag.getFloat("pitch")));
         }
     }
 
