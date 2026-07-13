@@ -12,6 +12,8 @@
 
 Phase 2 adds reversible `/sl test setup` and `/sl test reset` fixtures, subsystem test commands, a synchronized developer overlay, packet rejection counters, server tick measurements, bounded entity counts, dungeon generation workload, and transition-only structured dungeon logs. See [`DEBUGGING.md`](DEBUGGING.md).
 
+Phase 3 adds Hunter schema-v5 migration/clamping, guarded dungeon lifecycle transitions, per-record saved-data recovery, checked return coordinates, transient-state lifecycle cleanup, strict action-ID validation, mutation debouncing, and rate-limited rejection logs. See [`RUNTIME_RELIABILITY.md`](RUNTIME_RELIABILITY.md).
+
 ## Code-path checks included
 
 - Player login synchronization
@@ -23,6 +25,8 @@ Phase 2 adds reversible `/sl test setup` and `/sl test reset` fixtures, subsyste
 - Health and mana regeneration scaling
 - Critical-hit and evasion bounds
 - Server-side packet validation
+- Unknown/malformed action rejection with bounded diagnostics
+- Independent malformed dungeon-record recovery and legacy lifecycle migration
 - Loss-safe full-storage handling and indexed System Inventory retrieval
 - Ability mana and cooldown checks
 - Target line raycast and range checks

@@ -1,5 +1,6 @@
 package com.tre.sololeveling.dungeon;
 
+import com.mojang.logging.LogUtils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -10,8 +11,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
 
 public final class DungeonSavedData extends SavedData {
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final int DATA_VERSION = 2;
     private static final int MAX_ARENA_SLOTS = 4096;
 
     private final Map<String, DungeonTypes.GateDefinition> gates = new LinkedHashMap<>();
@@ -51,6 +55,7 @@ public final class DungeonSavedData extends SavedData {
 
     @Override
     public CompoundTag save(CompoundTag tag) {
+        tag.putInt("data_version", DATA_VERSION);
         tag.putLong("next_session_sequence", nextSessionSequence);
         tag.putInt("next_arena_slot", nextArenaSlot);
         ListTag gateList = new ListTag();
@@ -66,15 +71,41 @@ public final class DungeonSavedData extends SavedData {
         DungeonSavedData data = new DungeonSavedData();
         data.nextSessionSequence = Math.max(1L, tag.getLong("next_session_sequence"));
         data.nextArenaSlot = Math.floorMod(tag.getInt("next_arena_slot"), MAX_ARENA_SLOTS);
+        int rejectedGates = 0;
         ListTag gates = tag.getList("gates", Tag.TAG_COMPOUND);
         for (int i = 0; i < gates.size(); i++) {
-            DungeonTypes.GateDefinition gate = DungeonTypes.GateDefinition.load(gates.getCompound(i));
-            data.gates.put(gate.gateId(), gate);
+            try {
+                CompoundTag persisted = gates.getCompound(i);
+                if (persisted.getString("gate_id").isBlank() || persisted.getString("template_id").isBlank()) {
+                    rejectedGates++;
+                    continue;
+                }
+                DungeonTypes.GateDefinition gate = DungeonTypes.GateDefinition.load(persisted);
+                data.gates.put(gate.gateId(), gate);
+            } catch (RuntimeException malformed) {
+                rejectedGates++;
+            }
         }
+        int rejectedSessions = 0;
         ListTag sessions = tag.getList("sessions", Tag.TAG_COMPOUND);
         for (int i = 0; i < sessions.size(); i++) {
-            DungeonSession session = DungeonSession.load(sessions.getCompound(i));
-            data.sessions.put(session.sessionId(), session);
+            try {
+                CompoundTag persisted = sessions.getCompound(i);
+                if (!persisted.hasUUID("session_id") || !persisted.hasUUID("owner")
+                        || persisted.getString("template_id").isBlank()) {
+                    rejectedSessions++;
+                    continue;
+                }
+                DungeonSession session = DungeonSession.load(persisted);
+                data.sessions.put(session.sessionId(), session);
+            } catch (RuntimeException malformed) {
+                rejectedSessions++;
+            }
+        }
+        if (rejectedGates > 0 || rejectedSessions > 0) {
+            LOGGER.warn("[DUNGEON] Recovered saved data by rejecting {} malformed gate(s) and {} malformed session(s)",
+                    rejectedGates, rejectedSessions);
+            data.setDirty();
         }
         return data;
     }

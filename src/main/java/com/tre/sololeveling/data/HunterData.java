@@ -1,5 +1,6 @@
 package com.tre.sololeveling.data;
 
+import com.mojang.logging.LogUtils;
 import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.dungeon.DungeonRuntime;
@@ -14,6 +15,7 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
@@ -34,10 +36,15 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
 
 public final class HunterData {
     public static final String KEY = "SoloLevelingHunterData";
-    public static final int DATA_VERSION = 4;
+    public static final int DATA_VERSION = 5;
+    private static final Logger LOGGER = LogUtils.getLogger();
+    private static final int MAX_PENDING_CHOICES = 20;
+    private static final String[] PERSISTED_LISTS = {"unlocked_titles", "completed_quests", "notifications",
+            "shadows", "active_shadows", "imprints", "system_inventory"};
     private static final UUID STRENGTH_DAMAGE = UUID.fromString("0b95a0a4-cf1a-41c0-b0f4-9a8dd83d5831");
     private static final UUID AGILITY_SPEED = UUID.fromString("f0cff684-33cc-4a42-bf40-18d2551d0786");
     private static final UUID STAMINA_HEALTH = UUID.fromString("bbfc2c5f-c616-46e7-934e-1a3f8ef45e90");
@@ -53,12 +60,12 @@ public final class HunterData {
         CompoundTag root = player.getPersistentData();
         if (!root.contains(KEY, Tag.TAG_COMPOUND)) root.put(KEY, defaults());
         CompoundTag data = root.getCompound(KEY);
-        migrate(data);
+        migrate(player, data);
         sanitize(data);
         return data;
     }
 
-    private static void migrate(CompoundTag data) {
+    private static void migrate(Player player, CompoundTag data) {
         int previousVersion = data.contains("data_version", Tag.TAG_INT) ? data.getInt("data_version") : 0;
         migrateLegacyInt(data, "experience", "xp");
         migrateLegacyInt(data, "statPoints", "stat_points");
@@ -71,10 +78,12 @@ public final class HunterData {
 
         CompoundTag defaults = defaults();
         for (String key : defaults.getAllKeys()) {
-            if (!data.contains(key)) {
-                Tag value = defaults.get(key);
-                if (value != null) data.put(key, value.copy());
-            }
+            Tag value = defaults.get(key);
+            if (value == null) continue;
+            boolean validType = value instanceof NumericTag
+                    ? data.contains(key, Tag.TAG_ANY_NUMERIC)
+                    : data.contains(key, value.getId());
+            if (!validType) data.put(key, value.copy());
         }
 
         if (previousVersion < 3) {
@@ -89,7 +98,16 @@ public final class HunterData {
             if (parsed == null && data.contains("rank", Tag.TAG_STRING)) parsed = HunterRank.parse(data.getString("rank"));
             if (parsed != null) data.putInt("rank_override_tier", parsed.tier());
         }
+        if (previousVersion < 5) {
+            // Version 5 formalizes bounded pending-choice state. The next-threshold
+            // fields remain authoritative, so a restart cannot enqueue the same reward twice.
+            data.putInt("pending_growth_choices", clamp(data.getInt("pending_growth_choices"), 0, MAX_PENDING_CHOICES));
+            data.putInt("pending_major_milestones", clamp(data.getInt("pending_major_milestones"), 0, MAX_PENDING_CHOICES));
+        }
         data.putInt("data_version", DATA_VERSION);
+        if (previousVersion > 0 && previousVersion < DATA_VERSION && player instanceof ServerPlayer serverPlayer) {
+            LOGGER.info("[HUNTER DATA] Migrated {} from schema {} to {}", serverPlayer.getUUID(), previousVersion, DATA_VERSION);
+        }
     }
 
     private static void migrateLegacyInt(CompoundTag data, String oldKey, String newKey) {
@@ -103,8 +121,17 @@ public final class HunterData {
         int maximumStat = Math.max(1, ModConfigs.MAX_PRIMARY_STAT.get());
         for (String stat : PRIMARY_STATS) tag.putInt(stat, Math.max(1, Math.min(maximumStat, tag.getInt(stat))));
         tag.putInt("stat_points", Math.max(0, tag.getInt("stat_points")));
+        // The equipment-aware upper bound is applied by initialize(); doing it here
+        // would recurse through accessory data while the schema is being sanitized.
         tag.putInt("mana", Math.max(0, tag.getInt("mana")));
         tag.putInt("gold", Math.max(0, tag.getInt("gold")));
+        tag.putInt("pending_growth_choices", clamp(tag.getInt("pending_growth_choices"), 0, MAX_PENDING_CHOICES));
+        tag.putInt("pending_major_milestones", clamp(tag.getInt("pending_major_milestones"), 0, MAX_PENDING_CHOICES));
+        tag.putInt("skill_evolution_tokens", Math.max(0, tag.getInt("skill_evolution_tokens")));
+        tag.putInt("shadow_capacity_bonus", clamp(tag.getInt("shadow_capacity_bonus"), 0, 100));
+        for (String listKey : PERSISTED_LISTS) {
+            if (!tag.contains(listKey, Tag.TAG_LIST)) tag.put(listKey, new ListTag());
+        }
         int rewarded = Math.max(1, Math.min(maximumLevel, tag.getInt("rewarded_level")));
         tag.putInt("rewarded_level", rewarded);
         int tier = tag.getInt("rank_override_tier");
@@ -120,6 +147,10 @@ public final class HunterData {
         tag.putInt("level", level);
         tag.putInt("xp", (int)Math.min(Integer.MAX_VALUE, xp));
         grantLevelRewards(tag, level);
+    }
+
+    private static int clamp(int value, int minimum, int maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
     }
 
     private static CompoundTag defaults() {
@@ -191,7 +222,7 @@ public final class HunterData {
     public static CompoundTag mutable(ServerPlayer player) { return raw(player); }
     public static void replace(ServerPlayer player, CompoundTag replacement) {
         CompoundTag restored = replacement == null ? defaults() : replacement.copy();
-        migrate(restored);
+        migrate(player, restored);
         sanitize(restored);
         player.getPersistentData().put(KEY, restored);
         initialize(player);

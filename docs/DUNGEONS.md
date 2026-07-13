@@ -23,6 +23,7 @@ The four former 89×19×89 maps and their NBT templates are removed from the act
 ## Architecture
 
 - Server-authoritative state persists in overworld `SavedData` under `sololeveling_dungeons`.
+- Sessions use the guarded `WAITING -> BUILDING -> READY -> ACTIVE -> BOSS -> REWARD -> COMPLETED -> CLEANING -> CLOSED` lifecycle; failures enter `FAILED` before cleaning.
 - Session arena slots begin near X/Z 50,000 and are spaced 224×320 blocks.
 - The arena origin is Y -32.
 - The authored bounds are 173×50×265 with five-block local protection around rooms and corridors.
@@ -60,6 +61,7 @@ The four former 89×19×89 maps and their NBT templates are removed from the act
 - When every party member disconnects, encounter and objective timers pause for a one-minute reconnect grace period; a remaining party member keeps the run active.
 - Completed sessions retain reconnect reward and safe-return recovery for five minutes before staged cleanup.
 - Death, logout, reconnect, stale-session recovery, and cleanup preserve return safety.
+- Malformed gates/sessions are isolated during load, and invalid return coordinates fall back to a checked overworld spawn.
 - Old layout sessions are invalidated through arena layout version 5 and removed safely.
 
 ## Metrics
