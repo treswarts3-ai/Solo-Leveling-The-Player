@@ -91,8 +91,8 @@ public final class DungeonEvents {
                 .then(Commands.literal("teleport").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("region", StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(
-                                        new String[] {"entrance", "bridge", "ossuary", "foundry", "plaza", "basilica",
-                                                "prison", "archive", "court", "arena", "reward"}, builder))
+                                        new String[] {"entrance", "necropolis", "guardian", "catacombs", "bridge",
+                                                "prison", "elite", "ritual", "arena", "reward"}, builder))
                                 .executes(context -> send(context.getSource(), DungeonRuntime.teleportRegion(
                                         context.getSource().getPlayerOrException(),
                                         StringArgumentType.getString(context, "region"))))))
@@ -105,9 +105,9 @@ public final class DungeonEvents {
                         .then(Commands.literal("shell").executes(context -> send(context.getSource(),
                                 DungeonRuntime.validateCurrent(context.getSource().getPlayerOrException()))))
                         .then(Commands.literal("encounters").executes(context -> send(context.getSource(),
-                                DungeonRuntime.Result.ok("Encounter markers: bridge, ossuary, plaza, foundry, basilica, prison, court, arena, reward"))))
+                                DungeonRuntime.Result.ok("Template markers: necropolis, guardian, catacombs, bridge, prison, elite, ritual, arena, reward"))))
                         .then(Commands.literal("lighting").executes(context -> send(context.getSource(),
-                                DungeonRuntime.Result.ok("Lighting palette uses sea lanterns, soul lanterns, shroomlights, and hidden landmark lighting")))))
+                                DungeonRuntime.Result.ok("Each structure module requires four or more authored light blocks")))))
                 .then(Commands.literal("open").requires(source -> source.hasPermission(2))
                         .then(Commands.argument("template", StringArgumentType.word())
                                 .suggests((context, builder) -> SharedSuggestionProvider.suggest(DungeonContent.templateIds(), builder))
@@ -203,6 +203,7 @@ public final class DungeonEvents {
             animateGates(server);
             DungeonRuntime.tick(server);
             DungeonCombatBehavior.tick(server);
+            DungeonArena.tickPresentation(server);
             synchronizeDungeonDoors(server);
         }
     }
