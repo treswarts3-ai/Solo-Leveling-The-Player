@@ -1,6 +1,6 @@
 # Integration Status
 
-## Current verified checkpoint
+## Historical verified release checkpoint
 
 - Repository: `treswarts3-ai/Solo-Leveling-The-Player`
 - Release branch: `main`
@@ -10,6 +10,8 @@
 - Verified artifact: `sololeveling-1.0.0.jar`
 - Artifact SHA-256: `e85f06fc8439c7e63f573079466b64efadd9aee93dfa9bc7829baf1e082f2fc1`
 - Forge target: Minecraft 1.20.1 / Forge 47.4.10 / Java 17
+
+This checkpoint predates the current `main` branch. It proves that the earlier release candidate built; it does not verify later dungeon, gate, UI, progression, combat, or command changes. Current acceptance must be recorded against the exact tested commit in `docs/ACCEPTANCE_TESTS.md`.
 
 ## Integrated systems
 
@@ -46,4 +48,4 @@ The codebase is compiled and packaged, but hands-on validation is still required
 
 ## Release policy
 
-Version 1.0.0 is published as a prerelease until the runtime and multiplayer acceptance checks above are completed. The integration and testing workflow owns CI repairs, release promotion, and follow-up fixes on `main`.
+Version 1.0.0 remains a prerelease until every required row in `docs/ACCEPTANCE_TESTS.md` has evidence for one exact commit and no release-blocking result remains.
