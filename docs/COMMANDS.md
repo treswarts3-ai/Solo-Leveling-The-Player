@@ -38,6 +38,18 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl ability mana_fill <player>` | Restore mana |
 | `/sl ability evolution_reset <player> quicksilver` | Clear the permanent Quicksilver branch and restore one test token |
 
+### Phase 2 testing and debugging
+
+| Command | Purpose |
+|---|---|
+| `/sl test setup` | Preserve the current player and load the controlled test fixture |
+| `/sl test reset` | Restore the preserved player data and inventory |
+| `/sl test progression|combat|dungeon|shadows|multiplayer` | Run one structured diagnostic suite |
+| `/sl debug overlay` | Toggle the synchronized developer overlay |
+| `/sl debug player|dungeon|packets|entities|performance` | Print measured subsystem state |
+
+Full fields and expected runtime evidence are documented in [`DEBUGGING.md`](DEBUGGING.md).
+
 
 ## Master dungeon commands
 
