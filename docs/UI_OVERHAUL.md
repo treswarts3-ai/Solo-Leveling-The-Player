@@ -50,7 +50,7 @@ Available tabs:
 - **Equipment** — primary weapon, armor, accessories, and synchronized equipment context. Minecraft inventory remains authoritative.
 - **Quests** — active progression, daily objectives, completion state, emergency quest state, and claim action.
 - **Shop** — product descriptions, prices, affordability, storage capacity, disabled reasons, and confirmations for expensive products.
-- **Dungeons** — the four implemented authored dungeon types, rank, recommended level, map description, rewards, and current synchronized dungeon state. Entry remains gate/command driven because no safe server dungeon-entry UI action exists yet.
+- **Dungeons** — the Abyssal Necropolis master dungeon, rank, recommended level, description, and live synchronized session state/objective progress. Entry remains gate-driven.
 - **Shadows** — stored and active counts, army mode, shadow list, and only actions supported by current server logic.
 - **Settings** — HUD visibility, scale, opacity, anchor, offsets, compact/minimal modes, names, notifications, and reset.
 
@@ -103,6 +103,8 @@ Notifications are queued and displayed one at a time with entry/exit motion and 
 - Dungeon state
 
 The renderer uses category colors and safe built-in sound feedback. Missing backend detail falls back to text rather than crashing.
+
+Pending messages follow the release priority order: level up, ability unlock, quest complete, rank advancement, dungeon objective, item obtained, then failure/error. A notification already being displayed is never interrupted, equal-priority messages remain ordered, and queue overflow discards the lowest-priority tail.
 
 ## Reusable UI components
 
