@@ -50,7 +50,7 @@ jobs:
             src/main/java/com/tre/sololeveling/dungeon src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java docs/COMMANDS.md docs/DUNGEONS.md
           grep -q 'MAX_BLOCK_VISITS_PER_TICK = 16_384' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
           grep -q 'MAX_BLOCK_CHANGES_PER_TICK = 4_096' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
-          grep -q 'SessionState { BUILDING, WAITING' src/main/java/com/tre/sololeveling/dungeon/DungeonTypes.java
+          grep -q 'SessionState { WAITING, BUILDING, READY, ACTIVE, BOSS, REWARD, COMPLETED, FAILED, CLEANING, CLOSED }' src/main/java/com/tre/sololeveling/dungeon/DungeonTypes.java
           grep -q 'DungeonArena.tickJobs(server)' src/main/java/com/tre/sololeveling/dungeon/DungeonRuntime.java
           ! grep -R -n 'MasterDungeonBuilder\.build(' src/main/java/com/tre/sololeveling/dungeon
 
