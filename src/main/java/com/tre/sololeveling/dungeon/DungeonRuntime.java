@@ -529,7 +529,28 @@ public final class DungeonRuntime {
             Item item = ForgeRegistries.ITEMS.getValue(itemReward.itemId());
             if (item == null || item == Items.AIR) continue;
             ItemStack stack = new ItemStack(item, itemReward.count());
-            if (!player.getInventory().add(stack)) player.drop(stack, false);
+            if (!player.getInventory().add(stack)) {
+                // Dungeon loot must not depend on a temporary world drop. The persistent
+                // System inventory is the loss-safe overflow path used by the rest of the mod.
+                // ItemStack#copy is intentional because inventory insertion may mutate stack.
+                ItemStack overflow = stack.copy();
+                if (!overflow.isEmpty() && !HunterData.storeSystemItem(player, overflow)) {
+                    // Both inventories being full is visible and recoverable, but never silent.
+                    // Retain vanilla ownership protection as the final fallback.
+                    var dropped = player.drop(overflow, false);
+                    if (dropped != null) {
+                        dropped.setOwner(player.getUUID());
+                        dropped.setPickUpDelay(0);
+                    }
+                    player.sendSystemMessage(Component.literal(
+                                    "[SYSTEM] Reward storage is full. Loot was placed at your feet.")
+                            .withStyle(ChatFormatting.RED));
+                } else if (!overflow.isEmpty()) {
+                    player.sendSystemMessage(Component.literal(
+                                    "[SYSTEM] Inventory full. Dungeon loot moved to System storage.")
+                            .withStyle(ChatFormatting.GOLD));
+                }
+            }
         }
         HunterData.sync(player);
         try {
