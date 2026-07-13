@@ -579,6 +579,13 @@ public final class StandardAbilities {
                         ParticleTypes.REVERSE_PORTAL, 4.0D, 24);
             }
         }
+
+        @Override public void cancel(ServerPlayer player) {
+            // Domain is a live, mana-draining combat stance rather than persistent
+            // progression. Never restore it after death, logout, dimension travel,
+            // or a server restart.
+            HunterData.mutable(player).putBoolean("monarch_domain", false);
+        }
     }
 
     private enum ShadowHook { EXCHANGE, EXTRACTION, SUMMONING }
