@@ -26,6 +26,7 @@
 - Staggered shadow target acquisition and suspended far-distance searches
 - Shadow loot and XP suppression
 - Penalty recovery command
+- Penalty arena construction capped at 512 placement operations per server tick with persisted resume state
 - Missing optional dependency safety
 
 ## Runtime testing limitation
