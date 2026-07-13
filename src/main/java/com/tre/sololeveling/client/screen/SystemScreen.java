@@ -224,6 +224,22 @@ public final class SystemScreen extends Screen {
             rebuildWidgets();
         });
         addRenderableWidget(reset);
+
+        int evolutionY = bottom - 64;
+        SystemButton phantomStep = new SystemButton(contentX, evolutionY, half, 18,
+                Component.literal("EVOLVE: PHANTOM STEP"),
+                () -> confirm("EVOLVE QUICKSILVER", "Spend one token on Phantom Step? This choice is permanent.",
+                        () -> SystemUi.Actions.send("EVOLVE:quicksilver:phantom_step", 600L)), true);
+        SystemButton flashExecution = new SystemButton(contentX + half + 4, evolutionY, contentWidth - half - 4, 18,
+                Component.literal("EVOLVE: FLASH EXECUTION"),
+                () -> confirm("EVOLVE QUICKSILVER", "Spend one token on Flash Execution? This choice is permanent.",
+                        () -> SystemUi.Actions.send("EVOLVE:quicksilver:flash_execution", 600L)), true);
+        phantomStep.disabledReason("Requires unlocked Quicksilver and one unspent evolution token.");
+        flashExecution.disabledReason("Requires unlocked Quicksilver and one unspent evolution token.");
+        actionButtons.put("ability:evolve:phantom_step", phantomStep);
+        actionButtons.put("ability:evolve:flash_execution", flashExecution);
+        addRenderableWidget(phantomStep);
+        addRenderableWidget(flashExecution);
     }
 
     private void toggleAbilitySlot(int slot) {
@@ -357,10 +373,21 @@ public final class SystemScreen extends Screen {
         if (activate != null) {
             boolean unlocked = selected != null && isUnlocked(data, selected);
             long remaining = selected == null ? 0L : data.cooldownRemaining(selected.id());
-            boolean enoughMana = selected != null && data.mana() >= selected.manaCost();
+            boolean enoughMana = selected != null && data.mana() >= effectiveManaCost(data, selected);
             activate.active = selected != null && unlocked && remaining <= 0L && enoughMana;
             activate.setMessage(Component.literal(selected == null ? "NO ABILITY" : remaining > 0L
                     ? SystemUi.Cooldowns.remainingText(data, selected.id()) : "ACTIVATE"));
+        }
+        boolean quicksilverSelected = "quicksilver".equals(selectedAbility);
+        boolean canEvolveQuicksilver = quicksilverSelected && data.skillUnlocked("quicksilver")
+                && data.raw().getInt("skill_evolution_tokens") > 0
+                && data.raw().getString("evolution_quicksilver").isBlank();
+        for (String variant : List.of("phantom_step", "flash_execution")) {
+            SystemButton evolution = actionButtons.get("ability:evolve:" + variant);
+            if (evolution != null) {
+                evolution.visible = quicksilverSelected && data.raw().getString("evolution_quicksilver").isBlank();
+                evolution.active = canEvolveQuicksilver;
+            }
         }
         for (int slot = 0; slot < SystemUi.ACTION_SLOT_COUNT; slot++) {
             SystemButton button = actionButtons.get("ability:slot:" + slot);
@@ -513,7 +540,7 @@ public final class SystemScreen extends Screen {
             graphics.drawString(font, key, contentX + listWidth - font.width(key) - 9, y + 4,
                     conflict ? SystemUi.Theme.FAILURE : SystemUi.Theme.VIOLET, false);
             String state = !unlocked ? "LOCKED" : data.cooldownRemaining(definition.id()) > 0L
-                    ? SystemUi.Cooldowns.remainingText(data, definition.id()) : data.mana() < definition.manaCost() ? "NO MANA" : "READY";
+                    ? SystemUi.Cooldowns.remainingText(data, definition.id()) : data.mana() < effectiveManaCost(data, definition) ? "NO MANA" : "READY";
             graphics.drawString(font, state, contentX + 7, y + 13,
                     !unlocked ? SystemUi.Theme.TEXT_DIM : "READY".equals(state) ? SystemUi.Theme.SUCCESS : SystemUi.Theme.WARNING, false);
         }
@@ -524,7 +551,8 @@ public final class SystemScreen extends Screen {
         if (split && selected != null) renderAbilityDetails(graphics, data, selected, contentX + listWidth + 4, contentY, contentWidth - listWidth - 4, listBottom - contentY);
         else if (selected != null && mouseX >= contentX && mouseX < contentX + listWidth && mouseY >= contentY && mouseY < listBottom) {
             List<Component> tooltip = List.of(Component.literal(selected.displayName()), Component.literal(selected.description()),
-                    Component.literal("Mana " + selected.manaCost() + "  •  Cooldown " + formatSeconds(selected.cooldownSeconds()) + "s"),
+                    Component.literal("Mana " + effectiveManaCost(data, selected) + "  •  Cooldown "
+                            + formatSeconds(effectiveCooldownTicks(data, selected) / 20.0D) + "s"),
                     Component.literal(selected.unlock().description()), Component.literal("Key: " + ClientKeyMappings.keyName(selected.id())));
             graphics.renderComponentTooltip(font, tooltip, mouseX, mouseY);
         }
@@ -539,13 +567,37 @@ public final class SystemScreen extends Screen {
         List<String> lines = SystemUi.wrap(font, definition.description(), width - 16, 4);
         for (int i = 0; i < lines.size(); i++) graphics.drawString(font, lines.get(i), x + 8, y + 47 + i * 11, SystemUi.Theme.TEXT, false);
         int detailsY = y + 96;
-        graphics.drawString(font, "Mana cost: " + definition.manaCost(), x + 8, detailsY, data.mana() >= definition.manaCost() ? SystemUi.Theme.CYAN : SystemUi.Theme.FAILURE, false);
-        graphics.drawString(font, "Cooldown: " + formatSeconds(definition.cooldownSeconds()) + "s", x + 8, detailsY + 13, SystemUi.Theme.TEXT_DIM, false);
+        int effectiveMana = effectiveManaCost(data, definition);
+        graphics.drawString(font, "Mana cost: " + effectiveMana, x + 8, detailsY, data.mana() >= effectiveMana ? SystemUi.Theme.CYAN : SystemUi.Theme.FAILURE, false);
+        graphics.drawString(font, "Cooldown: " + formatSeconds(effectiveCooldownTicks(data, definition) / 20.0D) + "s", x + 8, detailsY + 13, SystemUi.Theme.TEXT_DIM, false);
         graphics.drawString(font, "Range: " + (definition.maximumRange() <= 0 ? "Self" : formatSeconds(definition.maximumRange()) + " blocks"), x + 8, detailsY + 26, SystemUi.Theme.TEXT_DIM, false);
         graphics.drawString(font, "Key: " + ClientKeyMappings.keyName(definition.id()), x + 8, detailsY + 39,
                 ClientKeyMappings.hasConflict(definition.id()) ? SystemUi.Theme.FAILURE : SystemUi.Theme.VIOLET, false);
         List<String> unlock = SystemUi.wrap(font, definition.unlock().description(), width - 16, 2);
         for (int i = 0; i < unlock.size(); i++) graphics.drawString(font, unlock.get(i), x + 8, detailsY + 55 + i * 11, SystemUi.Theme.TEXT_DIM, false);
+        if (definition.id().equals("quicksilver")) {
+            String evolution = data.raw().getString("evolution_quicksilver");
+            String label = evolution.isBlank() ? "Evolution: available with token" : "Evolution: " + SystemUi.titleCase(evolution);
+            graphics.drawString(font, label, x + 8, detailsY + 79, evolution.isBlank() ? SystemUi.Theme.WARNING : SystemUi.Theme.VIOLET, false);
+        }
+    }
+
+    private static int effectiveManaCost(SystemUi.Data data, AbilityDefinition definition) {
+        if (!definition.id().equals("quicksilver")) return definition.manaCost();
+        return switch (data.raw().getString("evolution_quicksilver")) {
+            case "phantom_step" -> 16;
+            case "flash_execution" -> 36;
+            default -> definition.manaCost();
+        };
+    }
+
+    private static int effectiveCooldownTicks(SystemUi.Data data, AbilityDefinition definition) {
+        if (!definition.id().equals("quicksilver")) return definition.cooldownTicks();
+        return switch (data.raw().getString("evolution_quicksilver")) {
+            case "phantom_step" -> 160;
+            case "flash_execution" -> 280;
+            default -> definition.cooldownTicks();
+        };
     }
 
     private void renderInventory(GuiGraphics graphics, SystemUi.Data data, int mouseX, int mouseY) {

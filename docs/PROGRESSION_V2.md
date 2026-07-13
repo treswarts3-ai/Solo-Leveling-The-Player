@@ -55,7 +55,14 @@ Beginning at level 10, every ten levels queues one persistent major reward choic
 ### Evolution
 
 - +1 persistent Skill Evolution Token
-- reserved for future ability-upgrade selection
+- spent on a permanent ability branch from the Abilities screen
+
+The first complete evolution pair is Quicksilver:
+
+- **Phantom Step** - 16 mana and an 8-second cooldown, emphasizing frequent controlled movement.
+- **Flash Execution** - 36 mana and a 14-second cooldown; requires a visible target within 10 blocks, moves to a safe arrival point, and attempts an agility-scaled finishing strike before granting the speed burst.
+
+The server validates the unlocked base ability, token balance, variant ID, and one-time choice. The System asks for confirmation because the branch is permanent, synchronizes the effective mana/cooldown display, and never trusts the client to spend the token.
 
 ### Mastery
 
@@ -124,6 +131,7 @@ Major milestone fields:
 - `milestone_mastery`
 - `milestone_cache`
 - `last_major_milestone_choice`
+- `evolution_quicksilver`
 
 Rank evaluation fields:
 

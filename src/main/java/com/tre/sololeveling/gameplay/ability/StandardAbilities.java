@@ -110,8 +110,30 @@ public final class StandardAbilities {
                     new AbilityScaling(0, 0.02D, 0, 0, 0)));
         }
 
+        @Override public int manaCost(ServerPlayer player) {
+            return "phantom_step".equals(HunterData.mutable(player).getString("evolution_quicksilver"))
+                    ? 16 : "flash_execution".equals(HunterData.mutable(player).getString("evolution_quicksilver")) ? 36
+                    : definition().manaCost();
+        }
+
+        @Override public int cooldownTicks(ServerPlayer player) {
+            return "phantom_step".equals(HunterData.mutable(player).getString("evolution_quicksilver"))
+                    ? 160 : "flash_execution".equals(HunterData.mutable(player).getString("evolution_quicksilver")) ? 280
+                    : definition().cooldownTicks();
+        }
+
         @Override public AbilityResult activate(AbilityContext context) {
             ServerPlayer player = context.player();
+            String evolution = HunterData.mutable(player).getString("evolution_quicksilver");
+            LivingEntity executionTarget = null;
+            if (evolution.equals("flash_execution")) {
+                executionTarget = AbilityTargeting.livingRayTarget(player, 10.0D);
+                if (executionTarget == null) return AbilityResult.failure("Flash Execution requires a visible target within 10 blocks.");
+                Vec3 destination = AbilityEffects.safeNearTarget(player, executionTarget, 1.45D);
+                if (destination == null || !AbilityEffects.moveIfClear(player, destination)) {
+                    return AbilityResult.failure("Flash Execution has no safe arrival position.");
+                }
+            }
             int agility = HunterData.getStat(player, "agility");
             int amplifier = Math.min(3, 1 + agility / 70);
             int duration = 120;
@@ -128,7 +150,16 @@ public final class StandardAbilities {
                     SoundSource.PLAYERS, 0.9F, 1.7F);
             AbilityEffects.ring(context.level(), player.position().add(0, 0.15D, 0), ParticleTypes.END_ROD, 1.2D, 24);
             AbilityEffects.particles(context.level(), player.position().add(0, 0.6D, 0), ParticleTypes.CLOUD, 28, 0.45D);
-            return AbilityResult.success("Burst active for 6 seconds.");
+            if (executionTarget != null) {
+                float damage = definition().scaling().apply(player, 10.0D);
+                if (!AbilityEffects.dealAbilityDamage(player, executionTarget, damage, "quicksilver")) {
+                    return AbilityResult.success("Flash Execution reached the target, but the finishing strike was resisted.");
+                }
+                AbilityEffects.particles(context.level(), executionTarget.position().add(0, 1, 0), ParticleTypes.CRIT, 28, 0.55D);
+                return AbilityResult.success("Flash Execution struck the target and triggered the speed burst.");
+            }
+            return AbilityResult.success(evolution.equals("phantom_step")
+                    ? "Phantom Step active: reduced mana cost and cooldown." : "Burst active for 6 seconds.");
         }
 
         @Override public void tick(ServerPlayer player) {

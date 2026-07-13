@@ -225,6 +225,12 @@ public final class SystemUi {
                     push(NotificationKind.SKILL_UNLOCK, "ABILITY UNLOCKED", titleCase(skill), 4200L);
                 }
             }
+            String oldQuicksilverEvolution = oldTag.getString("evolution_quicksilver");
+            String newQuicksilverEvolution = newTag.getString("evolution_quicksilver");
+            if (oldQuicksilverEvolution.isBlank() && !newQuicksilverEvolution.isBlank()) {
+                push(NotificationKind.SKILL_UNLOCK, "ABILITY EVOLVED",
+                        "Quicksilver - " + titleCase(newQuicksilverEvolution), 4600L);
+            }
             int goldDelta = Math.max(0, newTag.getInt("gold")) - Math.max(0, oldTag.getInt("gold"));
             if (goldDelta != 0) push(NotificationKind.GOLD, goldDelta > 0 ? "GOLD ACQUIRED" : "GOLD SPENT",
                     (goldDelta > 0 ? "+" : "") + goldDelta + " G", 3000L);

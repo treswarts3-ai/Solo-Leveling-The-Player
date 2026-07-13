@@ -170,6 +170,28 @@ public final class ProgressionChoiceHandler {
         return true;
     }
 
+    public static boolean chooseAbilityEvolution(ServerPlayer player, String ability, String rawVariant) {
+        CompoundTag tag = HunterData.mutable(player);
+        String id = normalize(ability);
+        String variant = normalize(rawVariant);
+        if (!id.equals("quicksilver") || (!variant.equals("phantom_step") && !variant.equals("flash_execution"))) return false;
+        if (!HunterData.hasSkill(player, "quicksilver") || tag.getInt("skill_evolution_tokens") <= 0
+                || !tag.getString("evolution_quicksilver").isBlank()) {
+            player.sendSystemMessage(Component.literal("[SYSTEM] Quicksilver evolution is unavailable.")
+                    .withStyle(ChatFormatting.RED));
+            return false;
+        }
+        tag.putInt("skill_evolution_tokens", tag.getInt("skill_evolution_tokens") - 1);
+        tag.putString("evolution_quicksilver", variant);
+        HunterData.sync(player);
+        String name = variant.equals("phantom_step") ? "Phantom Step" : "Flash Execution";
+        player.sendSystemMessage(Component.literal("[ABILITY EVOLVED] Quicksilver - " + name)
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        player.level().playSound(null, player.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
+                SoundSource.PLAYERS, 1.0F, variant.equals("phantom_step") ? 1.25F : 0.85F);
+        return true;
+    }
+
     private static boolean ensureRankState(ServerPlayer player, CompoundTag tag) {
         boolean changed = false;
         if (!tag.getBoolean("rank_progress_initialized")) {
