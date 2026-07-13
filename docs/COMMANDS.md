@@ -27,6 +27,17 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl sync <player>` | Force an owner-data sync |
 | `/sl dungeon open master` | Spawn the A-rank Abyssal Necropolis portal |
 
+### Ability test controls
+
+| Command | Purpose |
+|---|---|
+| `/sl ability list` | List every registered ability ID |
+| `/sl ability info <ability>` | Show unlock, mana, cooldown, range, and scaling metadata |
+| `/sl ability activate <player> <ability>` | Run the normal server-authoritative activation path |
+| `/sl ability cooldown_clear <player>` | Clear ability cooldowns |
+| `/sl ability mana_fill <player>` | Restore mana |
+| `/sl ability evolution_reset <player> quicksilver` | Clear the permanent Quicksilver branch and restore one test token |
+
 
 ## Master dungeon commands
 
