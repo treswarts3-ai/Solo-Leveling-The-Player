@@ -539,8 +539,8 @@ public final class DungeonRuntime {
                     // Retain vanilla ownership protection as the final fallback.
                     var dropped = player.drop(overflow, false);
                     if (dropped != null) {
-                        dropped.setOwner(player.getUUID());
                         dropped.setPickUpDelay(0);
+                        dropped.setExtendedLifetime();
                     }
                     player.sendSystemMessage(Component.literal(
                                     "[SYSTEM] Reward storage is full. Loot was placed at your feet.")
