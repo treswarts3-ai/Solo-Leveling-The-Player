@@ -803,6 +803,27 @@ public final class DungeonRuntime {
         return null;
     }
 
+    /** Adds server-authoritative dungeon state to the normal Hunter data snapshot. */
+    public static void appendSnapshot(ServerPlayer player, CompoundTag snapshot) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) {
+            snapshot.putBoolean("dungeon_active", false);
+            snapshot.putString("dungeon_state", "none");
+            snapshot.putString("dungeon_name", "");
+            snapshot.putString("dungeon_objective", "");
+            return;
+        }
+        DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
+        DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
+        snapshot.putBoolean("dungeon_active", !session.isTerminal());
+        snapshot.putString("dungeon_state", session.state().name().toLowerCase(java.util.Locale.ROOT));
+        snapshot.putString("dungeon_name", template == null ? session.templateId() : template.displayName());
+        snapshot.putString("dungeon_objective", objective == null ? "" : objective.displayName());
+        snapshot.putInt("dungeon_objective_progress", session.objectiveProgress());
+        snapshot.putInt("dungeon_objective_target", objective == null ? 0 : objective.target());
+        snapshot.putInt("dungeon_time_seconds", Math.max(0, session.remainingTicks() / 20));
+    }
+
     public static String inspect(MinecraftServer server, DungeonSession session) {
         DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
         DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
