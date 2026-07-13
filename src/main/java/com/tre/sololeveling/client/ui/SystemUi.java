@@ -147,7 +147,20 @@ public final class SystemUi {
         }
 
         public String dungeonStatus() {
-            if (tag.getBoolean("dungeon_active")) return text("dungeon_name", "Dungeon run active");
+            if (tag.getBoolean("dungeon_active")) {
+                String name = text("dungeon_name", "Dungeon run active");
+                String state = tag.getString("dungeon_state");
+                if (!state.equals("active")) return name + " - " + titleCase(state);
+                String objective = tag.getString("dungeon_objective");
+                if (!objective.isBlank()) {
+                    int progress = Math.max(0, tag.getInt("dungeon_objective_progress"));
+                    int target = Math.max(0, tag.getInt("dungeon_objective_target"));
+                    return name + " - " + objective + (target > 0 ? " " + progress + "/" + target : "");
+                }
+                return name;
+            }
+            if (tag.getString("dungeon_state").equals("completed")) return "Dungeon cleared - recovery available";
+            if (tag.getString("dungeon_state").equals("failed")) return "Dungeon failed - safe return available";
             if (tag.getBoolean("dungeon_gate_nearby")) return "Gate detected nearby";
             return "No active dungeon";
         }
