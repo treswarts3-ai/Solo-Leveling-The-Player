@@ -61,6 +61,7 @@ public final class ClientEvents {
         if (SystemUi.Settings.showNotifications()) renderNotification(graphics, minecraft);
 
         SystemUi.Data data = ClientHunterData.view();
+        if (data.raw().getBoolean("debug_overlay")) renderDeveloperOverlay(graphics, minecraft, data);
         if (!data.awakened() || !data.hudEnabled()) return;
         float scale = SystemUi.Settings.hudScale() / 100.0F;
         float opacity = SystemUi.Settings.hudOpacity() / 100.0F;
@@ -72,6 +73,35 @@ public final class ClientEvents {
         if (SystemUi.Settings.showVitals()) renderStatusCluster(graphics, minecraft, data, screenWidth, screenHeight, opacity);
         if (SystemUi.Settings.showAbilityBar()) renderAbilityBar(graphics, minecraft, data, screenWidth, screenHeight, opacity);
         graphics.pose().popPose();
+    }
+
+    private static void renderDeveloperOverlay(GuiGraphics graphics, Minecraft minecraft, SystemUi.Data data) {
+        var tag = data.raw();
+        java.util.List<String> lines = java.util.List.of(
+                "SL DEBUG | tick " + String.format(Locale.ROOT, "%.2f/%.2fms", tag.getDouble("debug_tick_ms"), tag.getDouble("debug_tick_rolling_ms")),
+                "Player Lv" + data.level() + " " + data.rank() + " MP " + data.mana() + "/" + data.maxMana() + " G " + data.gold(),
+                "Stats " + tag.getString("debug_stats"),
+                "Active " + tag.getString("debug_active_abilities"),
+                "Cooldowns " + tag.getString("debug_cooldowns"),
+                "Dungeon " + tag.getString("debug_session_id") + " " + tag.getString("dungeon_state")
+                        + " | " + tag.getString("dungeon_objective"),
+                "Location " + tag.getString("debug_dungeon_location") + " | entities " + tag.getInt("debug_dungeon_entities"),
+                "Shadows " + tag.getInt("debug_active_shadows") + " active / " + tag.getInt("debug_stored_shadows") + " stored",
+                "Packets " + tag.getLong("debug_packets_received") + " received / " + tag.getLong("debug_packets_rejected") + " rejected",
+                "Generation " + tag.getString("debug_generation"),
+                "World " + tag.getString("debug_dimension") + " @ " + tag.getString("debug_position")
+                        + " | nearby " + tag.getInt("debug_nearby_entities")
+        );
+        int width = 0;
+        for (String line : lines) width = Math.max(width, minecraft.font.width(line));
+        int x = Math.max(4, minecraft.getWindow().getGuiScaledWidth() - width - 12);
+        int y = 6;
+        graphics.fill(x - 4, y - 3, x + width + 5, y + lines.size() * 10 + 2, 0xCC030711);
+        graphics.fill(x - 4, y - 3, x - 2, y + lines.size() * 10 + 2, SystemUi.Theme.CYAN);
+        for (int i = 0; i < lines.size(); i++) {
+            graphics.drawString(minecraft.font, lines.get(i), x, y + i * 10,
+                    i == 0 ? SystemUi.Theme.CYAN : SystemUi.Theme.TEXT, false);
+        }
     }
 
     private static void renderStatusCluster(GuiGraphics graphics, Minecraft minecraft, SystemUi.Data data,

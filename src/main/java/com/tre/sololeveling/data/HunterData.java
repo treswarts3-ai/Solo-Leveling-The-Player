@@ -3,6 +3,7 @@ package com.tre.sololeveling.data;
 import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.config.ModConfigs;
 import com.tre.sololeveling.dungeon.DungeonRuntime;
+import com.tre.sololeveling.debug.DebugInfrastructure;
 import com.tre.sololeveling.network.packet.SyncHunterDataPacket;
 import com.tre.sololeveling.gameplay.ProgressionFormulas;
 import com.tre.sololeveling.equipment.EquipmentEffects;
@@ -181,10 +182,20 @@ public final class HunterData {
         copy.putInt("evasion_chance_permille", (int)Math.round(getEvasionChance(player) * 1000.0D));
         copy.putInt("health_regen_milli", Math.round(getHealthRegenPerSecond(player) * 1000.0F));
         copy.putInt("mana_regen", getManaRegenPerSecond(player));
-        if (player instanceof ServerPlayer serverPlayer) DungeonRuntime.appendSnapshot(serverPlayer, copy);
+        if (player instanceof ServerPlayer serverPlayer) {
+            DungeonRuntime.appendSnapshot(serverPlayer, copy);
+            DebugInfrastructure.appendSnapshot(serverPlayer, copy);
+        }
         return copy;
     }
     public static CompoundTag mutable(ServerPlayer player) { return raw(player); }
+    public static void replace(ServerPlayer player, CompoundTag replacement) {
+        CompoundTag restored = replacement == null ? defaults() : replacement.copy();
+        migrate(restored);
+        sanitize(restored);
+        player.getPersistentData().put(KEY, restored);
+        initialize(player);
+    }
     public static void copy(Player from, Player to) { to.getPersistentData().put(KEY, raw(from).copy()); }
     public static void sync(ServerPlayer player) { ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new SyncHunterDataPacket(snapshot(player))); }
 

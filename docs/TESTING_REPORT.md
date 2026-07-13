@@ -8,6 +8,10 @@
 - Resource packaging
 - JAR output verification
 
+## Reproducible diagnostics
+
+Phase 2 adds reversible `/sl test setup` and `/sl test reset` fixtures, subsystem test commands, a synchronized developer overlay, packet rejection counters, server tick measurements, bounded entity counts, dungeon generation workload, and transition-only structured dungeon logs. See [`DEBUGGING.md`](DEBUGGING.md).
+
 ## Code-path checks included
 
 - Player login synchronization

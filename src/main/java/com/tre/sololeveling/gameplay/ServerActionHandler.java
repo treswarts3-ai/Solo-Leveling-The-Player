@@ -101,6 +101,7 @@ public final class ServerActionHandler {
     /** Broad abuse ceiling for every client action packet. */
     private static boolean allowAction(ServerPlayer player) {
         CompoundTag tag = HunterData.mutable(player);
+        tag.putLong("debug_packets_received", tag.getLong("debug_packets_received") + 1L);
         long now = player.level().getGameTime();
         long window = tag.getLong("packet_window_start");
         if (now - window >= 20L || now < window) {
@@ -109,7 +110,9 @@ public final class ServerActionHandler {
         }
         int count = tag.getInt("packet_window_count") + 1;
         tag.putInt("packet_window_count", count);
-        return count <= 20;
+        boolean allowed = count <= 20;
+        if (!allowed) tag.putLong("debug_packets_rejected", tag.getLong("debug_packets_rejected") + 1L);
+        return allowed;
     }
 
     /** Action-specific debounce for irreversible UI mutations. */
