@@ -51,6 +51,14 @@ AbilityIntegrationHooks.installQuestListener((player, definition) -> {
 
 The listener runs only after successful server activation and after the cooldown is applied.
 
+## Lifecycle guarantees
+
+- Ability state is canceled on death, logout, respawn, and dimension change.
+- Login also clears transient state left by a hard server stop before the first client snapshot.
+- Ruler's Authority releases held entities and revokes non-creative flight safely.
+- Stealth, Mutilation, Quicksilver, Bloodlust, Dragon's Fear, and Monarch's Domain do not resume after reconnect.
+- Unlocks, progression, mana, and cooldowns remain persistent; only live cast/stance state is cleared.
+
 ## Test commands
 
 - `/sl ability list`
