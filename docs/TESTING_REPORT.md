@@ -23,6 +23,7 @@
 - Ability mana and cooldown checks
 - Target line raycast and range checks
 - Shadow capacity and duplicate prevention flags
+- Staggered shadow target acquisition and suspended far-distance searches
 - Shadow loot and XP suppression
 - Penalty recovery command
 - Missing optional dependency safety
