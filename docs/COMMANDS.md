@@ -23,6 +23,7 @@ The root aliases are `/sl` and `/sololeveling`. Administrative mutations require
 | `/sl shadow dismissall <player>` | Dismiss active shadows |
 | `/sl shadow capacity add <player> <amount>` | Increase storage capacity |
 | `/sl giveall <player>` | Grant all registered mod items |
+| `/sl givemegodpowers <player>` | Grant the complete operator test loadout, unlocks, maximum progression and infinite test gold |
 | `/sl sync <player>` | Force an owner-data sync |
 | `/sl dungeon open master` | Spawn the A-rank Abyssal Necropolis portal |
 
