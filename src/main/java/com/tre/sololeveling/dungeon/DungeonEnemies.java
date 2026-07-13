@@ -40,7 +40,7 @@ public final class DungeonEnemies {
             for (int i = 0; i < entry.count(); i++) {
                 if (session.liveEnemyCount() >= DungeonTypes.MAX_LIVE_ENEMIES
                         || session.totalSpawns() >= DungeonTypes.MAX_WAVE_SPAWNS) return spawned;
-                BlockPos position = spawnPosition(session, sequence++);
+                BlockPos position = spawnPosition(level, session, sequence++);
                 LivingEntity entity = spawn(level, session, entry.enemyId(), position, rank, wave.collectionDrops());
                 if (entity != null) spawned++;
             }
@@ -138,7 +138,14 @@ public final class DungeonEnemies {
         if (instance != null) instance.setBaseValue(value);
     }
 
-    private static BlockPos spawnPosition(DungeonSession session, int index) {
+    private static BlockPos spawnPosition(ServerLevel level, DungeonSession session, int index) {
+        java.util.List<BlockPos> authored = DungeonArena.encounterSpawnPoints(level, session);
+        if (!authored.isEmpty()) {
+            BlockPos marker = authored.get(index % authored.size());
+            int ring = index / authored.size();
+            if (ring == 0) return marker;
+            return marker.offset((ring % 2 == 0 ? ring : -ring), 0, (ring % 3) - 1);
+        }
         BlockPos center = DungeonArena.encounterCenter(session);
         int[] offset = SPAWN_OFFSETS[index % SPAWN_OFFSETS.length];
         int ring = index / SPAWN_OFFSETS.length;

@@ -41,7 +41,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/generate_dungeon_structures.py --manifest /tmp/master-dungeon-metrics.json
+          python tools/generate_dungeon_structures.py \
+            --check src/main/resources/data/sololeveling/dungeon_modules/master \
+            --manifest /tmp/master-dungeon-metrics.json
           test ! -e src/main/resources/data/sololeveling/structures/dungeons/abandoned_subway.nbt
           test ! -e src/main/resources/data/sololeveling/structures/dungeons/red_orc_outpost.nbt
           test ! -e src/main/resources/data/sololeveling/structures/dungeons/demon_castle_foyer.nbt
@@ -50,6 +52,9 @@ jobs:
             src/main/java/com/tre/sololeveling/dungeon src/main/java/com/tre/sololeveling/client/screen/SystemScreen.java docs/COMMANDS.md docs/DUNGEONS.md
           grep -q 'MAX_BLOCK_VISITS_PER_TICK = 16_384' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
           grep -q 'MAX_BLOCK_CHANGES_PER_TICK = 4_096' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
+          test "$(find src/main/resources/data/sololeveling/dungeon_modules/master -name '*.snbt' | wc -l)" -eq 12
+          grep -q 'DungeonStructureTemplates.load(level)' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
+          ! grep -q 'void decorate\|void room\|void tunnelCell' src/main/java/com/tre/sololeveling/dungeon/MasterDungeonBuilder.java
           grep -q 'SessionState { WAITING, BUILDING, READY, ACTIVE, BOSS, REWARD, COMPLETED, FAILED, CLEANING, CLOSED }' src/main/java/com/tre/sololeveling/dungeon/DungeonTypes.java
           grep -q 'DungeonArena.tickJobs(server)' src/main/java/com/tre/sololeveling/dungeon/DungeonRuntime.java
           ! grep -R -n 'MasterDungeonBuilder\.build(' src/main/java/com/tre/sololeveling/dungeon

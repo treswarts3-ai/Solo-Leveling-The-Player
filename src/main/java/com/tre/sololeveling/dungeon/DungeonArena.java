@@ -2,8 +2,13 @@ package com.tre.sololeveling.dungeon;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -25,7 +30,7 @@ public final class DungeonArena {
     private static final int STRUCTURE_UPDATE_FLAGS = Block.UPDATE_CLIENTS;
     private static final int SLOT_COLUMNS = 32;
     private static final int SLOT_X_SPACING = 224;
-    private static final int SLOT_Z_SPACING = 320;
+    private static final int SLOT_Z_SPACING = 384;
     private static final int GATE_MIN_X = -3;
     private static final int GATE_MAX_X = 3;
     private static final int GATE_MIN_Y = 0;
@@ -76,6 +81,15 @@ public final class DungeonArena {
         return true;
     }
 
+    public static boolean queueLayoutUpgrade(DungeonSession session, BlockPos oldOrigin) {
+        if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
+            return false;
+        }
+        ACTIVE_JOBS.put(session.sessionId(), new ActiveArenaJob(session.dungeonDimension(), JobPurpose.REBUILD,
+                MasterDungeonBuilder.layoutUpgradeJob(oldOrigin, session.arenaOrigin())));
+        return true;
+    }
+
     public static boolean queueMigration(DungeonSession session, BlockPos oldOrigin) {
         if (!MasterDungeonBuilder.ID.equals(session.templateId()) || ACTIVE_JOBS.containsKey(session.sessionId())) {
             return false;
@@ -100,6 +114,7 @@ public final class DungeonArena {
 
     public static void resetJobs() {
         ACTIVE_JOBS.clear();
+        DungeonStructureTemplates.clearCache();
     }
 
     public static boolean cancelJob(UUID sessionId) {
@@ -143,6 +158,58 @@ public final class DungeonArena {
 
     public static BlockPos encounterCenter(DungeonSession session) {
         return session.arenaOrigin().offset(MasterDungeonBuilder.objectiveCenters().get(Math.min(Math.max(0, session.objectiveIndex()), MasterDungeonBuilder.objectiveCenters().size() - 1)));
+    }
+
+    public static List<BlockPos> encounterSpawnPoints(ServerLevel level, DungeonSession session) {
+        BlockPos center = encounterCenter(session);
+        List<BlockPos> result = new ArrayList<>();
+        for (Map.Entry<String, BlockPos> entry : DungeonStructureTemplates.load(level).markers().entrySet()) {
+            if (!entry.getKey().startsWith("enemy:")) continue;
+            BlockPos world = session.arenaOrigin().offset(entry.getValue());
+            if (world.distSqr(center) <= 32.0D * 32.0D) result.add(world);
+        }
+        return List.copyOf(result);
+    }
+
+    /** Activates presentation zones authored as structure DATA markers. */
+    public static void tickPresentation(MinecraftServer server) {
+        long now = server.overworld().getGameTime();
+        if (now % 10L != 0L) return;
+
+        for (DungeonSession session : DungeonSavedData.get(server).sessions().values()) {
+            if (!session.arenaBuilt() || session.isTerminal()) continue;
+            ServerLevel level = server.getLevel(session.dungeonDimension());
+            if (level == null) continue;
+
+            for (Map.Entry<String, BlockPos> entry : DungeonStructureTemplates.load(level).markers().entrySet()) {
+                String marker = entry.getKey();
+                if (!marker.startsWith("audio:") && !marker.startsWith("particle:")) continue;
+                BlockPos world = session.arenaOrigin().offset(entry.getValue());
+                if (!hasNearbyMember(server, level, session, world, 28.0D)) continue;
+
+                if (marker.startsWith("particle:")) {
+                    ParticleOptions particle = marker.contains("ritual") ? ParticleTypes.ENCHANT
+                            : marker.contains("boss") ? ParticleTypes.SOUL_FIRE_FLAME : ParticleTypes.END_ROD;
+                    level.sendParticles(particle, world.getX() + 0.5D, world.getY() + 0.8D,
+                            world.getZ() + 0.5D, 3, 0.7D, 0.4D, 0.7D, 0.01D);
+                } else if (now % 100L == 0L) {
+                    level.playSound(null, world, SoundEvents.RESPAWN_ANCHOR_AMBIENT,
+                            SoundSource.AMBIENT, 0.45F, marker.contains("boss") ? 0.65F : 0.85F);
+                }
+            }
+        }
+    }
+
+    private static boolean hasNearbyMember(MinecraftServer server, ServerLevel level, DungeonSession session,
+                                           BlockPos center, double radius) {
+        double radiusSquared = radius * radius;
+        for (UUID member : session.members()) {
+            ServerPlayer player = server.getPlayerList().getPlayer(member);
+            if (player != null && player.level() == level && player.blockPosition().distSqr(center) <= radiusSquared) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static BlockPos bossCenter(DungeonSession session) {
@@ -294,28 +361,7 @@ public final class DungeonArena {
     }
 
     public static List<String> validate(ServerLevel level, DungeonSession session) {
-        if (session.state() == DungeonTypes.SessionState.BUILDING) {
-            clearObjectiveMarkerObstructions(level, session);
-        }
         return MasterDungeonBuilder.validate(level, session.arenaOrigin());
-    }
-
-    /**
-     * Decorations are authored after room carving, so a statue, altar, or rubble pile can
-     * overlap a required encounter marker. Clear a small standing volume only during the
-     * post-build validation step; later manual validation cannot erase reward containers.
-     */
-    private static void clearObjectiveMarkerObstructions(ServerLevel level, DungeonSession session) {
-        for (BlockPos relative : MasterDungeonBuilder.objectiveCenters()) {
-            BlockPos center = session.arenaOrigin().offset(relative);
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dz = -1; dz <= 1; dz++) {
-                    for (int dy = 0; dy <= 2; dy++) {
-                        set(level, center.offset(dx, dy, dz), Blocks.AIR.defaultBlockState());
-                    }
-                }
-            }
-        }
     }
 
     public static BlockPos regionPoint(DungeonSession session, String region) {

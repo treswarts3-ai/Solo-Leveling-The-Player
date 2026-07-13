@@ -6,7 +6,7 @@ The mod exposes exactly one dungeon:
 
 | ID | Name | Rank | Scope |
 |---|---|---:|---|
-| `master` | Abyssal Necropolis | A | 173×50×265, 43 meaningful spaces, 13 major rooms, six regions, 21 floor elevations, six loops, three shortcuts, seven secrets |
+| `master` | Abyssal Necropolis | A | Twelve modular structure templates, nine objectives, three secrets, one unlockable shortcut |
 
 The four former 89×19×89 maps and their NBT templates are removed from the active source tree.
 
@@ -24,10 +24,10 @@ The four former 89×19×89 maps and their NBT templates are removed from the act
 
 - Server-authoritative state persists in overworld `SavedData` under `sololeveling_dungeons`.
 - Sessions use the guarded `WAITING -> BUILDING -> READY -> ACTIVE -> BOSS -> REWARD -> COMPLETED -> CLEANING -> CLOSED` lifecycle; failures enter `FAILED` before cleaning.
-- Session arena slots begin near X/Z 50,000 and are spaced 224×320 blocks.
+- Session arena slots begin near X/Z 50,000 and are spaced 224×384 blocks.
 - The arena origin is Y -32.
-- The authored bounds are 173×50×265 with five-block local protection around rooms and corridors.
-- The layout is fixed and handcrafted. Runtime randomness affects combat/rewards, not architecture.
+- The authored bounds are 103×28×336 across twelve replaceable modules.
+- Binary in-game structure exports override the checked-in starter SNBT modules without Java changes.
 - Arena queries and cleanup are bounded to the session AABB.
 - Placement skips identical states and uses client-update flags rather than full neighbor updates for every block.
 
@@ -62,22 +62,16 @@ The four former 89×19×89 maps and their NBT templates are removed from the act
 - Completed sessions retain reconnect reward and safe-return recovery for five minutes before staged cleanup.
 - Death, logout, reconnect, stale-session recovery, and cleanup preserve return safety.
 - Malformed gates/sessions are isolated during load, and invalid return coordinates fall back to a checked overworld spawn.
-- Old layout sessions are invalidated through arena layout version 5 and removed safely.
+- Old layout sessions are invalidated through arena layout version 6 and removed safely.
 
-## Metrics
+## Modules
 
-| Metric | Largest old map | Master | Multiplier |
-|---|---:|---:|---:|
-| Walkable floor area | 4,343 | 20,774 | 4.78× |
-| Objective-route distance | ~184 | 848 | 4.61× |
-| Meaningful rooms/spaces | 7 | 43 | 6.14× |
-| Major rooms | ~5 | 13 | 2.6× |
-| Distinct regions | 1 theme map | 6 connected districts | — |
+`00_entry`, `01_descent`, `02_outer_necropolis`, `03_guardian_hall`, `04_catacombs`, `05_collapsed_bridge`, `06_prison`, `07_elite_chamber`, `08_ritual_depths`, `09_boss_approach`, `10_boss_arena`, and `11_reward_vault`.
 
 ## Build validation
 
 ```bash
-python tools/generate_dungeon_structures.py --manifest /tmp/master-dungeon-metrics.json
+python tools/generate_dungeon_structures.py --check src/main/resources/data/sololeveling/dungeon_modules/master --manifest /tmp/master-dungeon-metrics.json
 ./gradlew clean build --stacktrace --no-daemon
 ```
 

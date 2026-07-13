@@ -132,7 +132,7 @@ public final class DungeonSession {
                     || next == DungeonTypes.SessionState.BUILDING;
             case REWARD -> next == DungeonTypes.SessionState.BUILDING;
             case COMPLETED -> next == DungeonTypes.SessionState.BUILDING;
-            case FAILED -> false;
+            case FAILED -> next == DungeonTypes.SessionState.BUILDING;
             case CLEANING -> next == DungeonTypes.SessionState.CLOSED;
             case CLOSED -> false;
         };

@@ -37,7 +37,7 @@ public final class DungeonRuntime {
         public static Result fail(String message) { return new Result(false, message); }
     }
 
-    public static final int ARENA_LAYOUT_VERSION = 5;
+    public static final int ARENA_LAYOUT_VERSION = 6;
 
     private static final Map<UUID, Integer> MISSING_BOSS_TICKS = new HashMap<>();
     private static final String PLAYER_RETURN_TAG = "sl_dungeon_return";
@@ -260,6 +260,8 @@ public final class DungeonRuntime {
     private static boolean resumeArenaJob(DungeonSession session) {
         return switch (session.pendingArenaJob()) {
             case "rebuild" -> DungeonArena.queueRebuild(session);
+            case "upgrade" -> session.hasMigrationOrigin()
+                    && DungeonArena.queueLayoutUpgrade(session, session.migrationOrigin());
             case "migration" -> session.hasMigrationOrigin()
                     && DungeonArena.queueMigration(session, session.migrationOrigin());
             default -> DungeonArena.queueBuild(session);
@@ -280,6 +282,9 @@ public final class DungeonRuntime {
                 data.sessions().remove(session.sessionId());
                 data.setDirty();
             } else {
+                // A failed staged job may already have mutated owned module volumes. Mark the
+                // arena for bounded cleanup even when preparation failed before the first visit.
+                session.setArenaBuilt(true);
                 fail(server, session, result.error().isBlank() ? "Dungeon generation job failed" : result.error());
             }
             return;
@@ -355,10 +360,10 @@ public final class DungeonRuntime {
         session.setDungeonLocation(Level.OVERWORLD, DungeonArena.originForSlot(session.arenaSlot()));
         session.setState(DungeonTypes.SessionState.BUILDING);
         session.setArenaBuilt(false);
-        session.setPendingArenaJob(legacySurfaceArena ? "migration" : "rebuild");
-        session.setMigrationOrigin(legacySurfaceArena ? oldOrigin : null);
+        session.setPendingArenaJob(legacySurfaceArena ? "migration" : "upgrade");
+        session.setMigrationOrigin(oldOrigin);
         boolean queued = legacySurfaceArena ? DungeonArena.queueMigration(session, oldOrigin)
-                : DungeonArena.queueRebuild(session);
+                : DungeonArena.queueLayoutUpgrade(session, oldOrigin);
         if (!queued) {
             fail(server, session, "Master dungeon recovery could not be queued");
             return false;

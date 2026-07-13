@@ -82,19 +82,19 @@ Common failure modes were identified from the old implementation and cross-check
 | Method | Visual control | Runtime reliability | Revision cost | Performance | Decision |
 |---|---|---|---|---|---|
 | Direct ad-hoc Java fills | Low–medium | Medium | High | Can be poor | Rejected: encourages primitive room spam |
-| One giant NBT template | High | Medium | High | Large decode/place burst | Rejected: unwieldy at 173×50×265 and difficult to review |
-| Multiple NBT region templates | High | High with careful seams | Medium | Good placement path | Viable, but would require an external build/export cycle not available in this repository |
+| One giant NBT template | High | Medium | High | Large decode/place burst | Rejected: unwieldy and difficult to review |
+| Multiple NBT region templates | High | High with careful seams | Medium | Good placement path | Selected in Phase 4 with explicit markers and staged placement |
 | Jigsaw structure | Medium | Medium | Medium | Good | Rejected: variation is not a priority and seam/pool complexity adds risk |
 | WorldEdit/Axiom-authored schematic | Very high | Depends on import path | Medium | Good after conversion | Recommended for future visual iteration, but not as a runtime dependency |
 | Dedicated dimension | High isolation | High after setup | High | Good | Rejected for this milestone: changes world architecture and migration scope |
 | Fixed isolated underground region | High | High | Medium | Bounded | Selected |
-| Deterministic data-driven Java blueprint | High when coordinates are authored | High | Medium | Requires bounded writes | Selected for the repository-native implementation |
+| Deterministic data-driven Java blueprint | High when coordinates are authored | High | Medium | Requires bounded writes | Retired in Phase 4 because Java is not the art-authoring tool |
 
 ## Selected architecture
 
-The active dungeon is a deterministic handcrafted Java blueprint placed in isolated overworld slots beginning around X/Z 50,000 at Y -32. Slot spacing is 224 blocks on X and 320 blocks on Z, preventing overlap for the 173×50×265 authored bounds.
+Phase 4 replaces the interim Java blueprint with twelve modular vanilla structure templates placed in isolated overworld slots beginning around X/Z 50,000 at Y -32. Slot spacing is 224 blocks on X and 384 blocks on Z. Java retains only orchestration, marker contracts, placement budgets, doors, validation, encounters, rewards, recovery, and cleanup.
 
-The blueprint is not a random generator. Forty-three named spaces, all links, room heights, palettes, objective centers, secrets, loops, shortcuts, landmarks, and final-arena geometry are fixed. The Python design validator mirrors the graph and metrics for CI.
+Normal in-game structure-block NBT exports override the checked-in text-form starter templates one module at a time. The Python validator reproduces the starter pack and verifies module order, dimensions, markers, secrets, shortcuts, and resource freshness for CI.
 
 ### Why not retain the four NBT maps
 
@@ -109,9 +109,9 @@ A custom dimension would provide stronger isolation, but it expands the change i
 
 ## Underground placement conclusions
 
-- The master bounds are 173×50×265 relative to the session origin.
-- The origin remains at Y -32, placing authored floors from Y -44 to Y -18 and the highest protected geometry at approximately Y 0.
-- Every room and corridor receives at least five blocks of deepslate protection beneath, above, and beside the playable cavity.
+- The modular bounds are 103×28×336 relative to the session origin.
+- The origin remains at Y -32, keeping every module far underground.
+- Each template owns its shell and connector openings; validation samples containment and marker safety after placement.
 - Fluids are not used as uncontrolled exterior features.
 - Safe player and mob placement require empty collision, empty fluids, valid world border, and sturdy flooring.
 - Arena slots are separated beyond their full bounds.
@@ -189,7 +189,7 @@ The player repeatedly sees and re-enters the central kingdom, creating orientati
 | First-build tick spike | resumable queue capped at 16,384 visits and 4,096 changes per tick | hardware-specific milliseconds require profiling |
 | Corridor/room seam | fixed graph and post-build marker validation | visual seam review still required |
 | Unsafe spawns | sturdy-floor/collision/fluid search | mob-specific pathfinding requires playtest |
-| Old saved sessions | layout version 5; persisted migration job clears legacy arena and builds the new slot in batches | interrupted jobs restart idempotently from their saved intent |
-| Navigation confusion | six region identities, central landmark, lighting, loops, shortcuts | needs full human walkthrough |
-| Visual repetition | distinct region palettes, ceiling heights, landmarks, architectural families | code-authored detail cannot replace final in-game art pass |
+| Old saved sessions | layout version 6; persisted migration job clears the legacy arena and builds the modular slot in batches | interrupted jobs restart idempotently from their saved intent |
+| Navigation confusion | repeated critical-route frames, module identities, secrets, and shortcut | needs full human walkthrough |
+| Visual repetition | twelve independently replaceable in-game modules with landmarks and detail layers | final visual approval still requires an in-game art pass |
 | Oversized cleanup | same bounded job queue and retained slot until completion | hardware-specific milliseconds require profiling |

@@ -14,6 +14,8 @@ Phase 2 adds reversible `/sl test setup` and `/sl test reset` fixtures, subsyste
 
 Phase 3 adds Hunter schema-v5 migration/clamping, guarded dungeon lifecycle transitions, per-record saved-data recovery, checked return coordinates, transient-state lifecycle cleanup, strict action-ID validation, mutation debouncing, and rate-limited rejection logs. See [`RUNTIME_RELIABILITY.md`](RUNTIME_RELIABILITY.md).
 
+Phase 4 replaces code-authored dungeon geometry with twelve vanilla structure-template modules, explicit gameplay/presentation markers, strict module/palette validation, independently replaceable in-game NBT exports, and bounded staged placement/owned-volume cleanup. See [`MASTER_DUNGEON_BUILD_GUIDE.md`](MASTER_DUNGEON_BUILD_GUIDE.md).
+
 ## Code-path checks included
 
 - Player login synchronization
@@ -27,6 +29,8 @@ Phase 3 adds Hunter schema-v5 migration/clamping, guarded dungeon lifecycle tran
 - Server-side packet validation
 - Unknown/malformed action rejection with bounded diagnostics
 - Independent malformed dungeon-record recovery and legacy lifecycle migration
+- Reproducible twelve-module structure pack and marker contract validation
+- Per-tick template placement and cleanup ceilings
 - Loss-safe full-storage handling and indexed System Inventory retrieval
 - Ability mana and cooldown checks
 - Target line raycast and range checks
