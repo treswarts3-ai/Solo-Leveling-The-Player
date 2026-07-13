@@ -1,6 +1,7 @@
 package com.tre.sololeveling.shadow;
 
 import com.tre.sololeveling.data.HunterData;
+import com.tre.sololeveling.gameplay.ability.AbilityMastery;
 import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -98,7 +99,9 @@ public final class ShadowProgressionService {
         int level = Math.max(1, record.getInt("level"));
         ShadowStorage.Rank rank = ShadowStorage.rank(record);
         double elite = record.getBoolean("named_elite") ? 1.10D : 1.0D;
-        double domain = HunterData.domainActive(owner) ? 1.20D : 1.0D;
+        boolean inDomain = HunterData.domainActive(owner)
+                && mob.distanceToSqr(owner) <= Math.pow(AbilityMastery.domainRadius(owner), 2.0D);
+        double domain = inDomain ? 1.20D : 1.0D;
         double scalar = rank.multiplier() * elite * domain;
 
         apply(mob.getAttribute(Attributes.MAX_HEALTH), modifierId(record, "health"), "Shadow Vitality",
@@ -114,7 +117,7 @@ public final class ShadowProgressionService {
         mob.getPersistentData().putString(ShadowSummoningService.TAG_RANK, rank.display());
         if (refillHealth) mob.setHealth(mob.getMaxHealth());
         else if (mob.getHealth() > mob.getMaxHealth()) mob.setHealth(mob.getMaxHealth());
-        if (HunterData.domainActive(owner)) {
+        if (inDomain) {
             mob.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, 30, 1, false, false));
             mob.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, 30, 0, false, false));
         }

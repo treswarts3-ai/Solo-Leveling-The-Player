@@ -4,6 +4,7 @@ import com.tre.sololeveling.SoloLevelingMod;
 import com.tre.sololeveling.client.screen.SystemScreen;
 import com.tre.sololeveling.client.ui.SystemUi;
 import com.tre.sololeveling.gameplay.ability.AbilityDefinition;
+import com.tre.sololeveling.gameplay.ability.AbilityMastery;
 import com.tre.sololeveling.gameplay.ability.AbilityService;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -30,6 +31,7 @@ public final class ClientEvents {
         if (event.phase != TickEvent.Phase.END) return;
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player == null) return;
+        ClientAbilityVisuals.tick();
 
         if (ClientKeyMappings.SYSTEM.consumeClick()) {
             if (minecraft.screen instanceof SystemScreen) minecraft.setScreen(null);
@@ -175,7 +177,9 @@ public final class ClientEvents {
             int slotY = y + 4;
             AbilityDefinition definition = AbilityService.definition(abilityId).orElse(null);
             boolean unlocked = definition != null && isUnlocked(data, definition);
-            boolean manaReady = definition != null && data.mana() >= definition.manaCost();
+            int manaCost = definition == null ? 0 : AbilityMastery.adjustManaCost(
+                    ClientHunterData.get(), abilityId, definition.manaCost());
+            boolean manaReady = definition != null && data.mana() >= manaCost;
             long remaining = definition == null ? 0L : SystemUi.Cooldowns.remaining(data, abilityId);
             long previous = LAST_COOLDOWN.getOrDefault(abilityId, 0L);
             if (remaining > previous && previous <= 0L) ACTIVE_FLASH_UNTIL.put(abilityId, nowMs + 450L);
@@ -262,8 +266,9 @@ public final class ClientEvents {
             return;
         }
         if (data.cooldownRemaining(abilityId) > 0L) return;
-        if (data.mana() < definition.manaCost()) {
-            SystemUi.Notifications.pushFailure(definition.displayName() + " requires " + definition.manaCost() + " mana");
+        int manaCost = AbilityMastery.adjustManaCost(ClientHunterData.get(), abilityId, definition.manaCost());
+        if (data.mana() < manaCost) {
+            SystemUi.Notifications.pushFailure(definition.displayName() + " requires " + manaCost + " mana");
             return;
         }
         SystemUi.Actions.send(actionForAbility(abilityId), 140L);

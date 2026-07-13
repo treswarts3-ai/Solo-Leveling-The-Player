@@ -18,7 +18,13 @@ The shadow workstream should install one adapter during common setup:
 ```java
 AbilityIntegrationHooks.installShadowAdapter(new AbilityIntegrationHooks.ShadowAdapter() {
     @Override
-    public AbilityResult exchange(ServerPlayer player) {
+    public Entity exchangeTarget(ServerPlayer player) {
+        // Select one safe owned shadow for the server-issued preview.
+        return null;
+    }
+
+    @Override
+    public AbilityResult exchange(ServerPlayer player, Entity preparedTarget) {
         // Validate shadow-specific state and perform exchange.
         return AbilityResult.success("Exchanged positions with a shadow.");
     }
@@ -44,12 +50,16 @@ Returning `AbilityResult.failure(...)` refunds the shared mana charge and does n
 The quest workstream can receive successful activations without editing ability implementations:
 
 ```java
-AbilityIntegrationHooks.installQuestListener((player, definition) -> {
+AbilityIntegrationHooks.installQuestListener((player, definition, manaSpent) -> {
     // Progress ability-use objectives using definition.id().
 });
 ```
 
-The listener runs only after successful server activation and after the cooldown is applied.
+The listener runs only after successful server resolution and after the cooldown is applied. Delayed casts that fail or are interrupted do not progress quests.
+
+## Cast timing and presentation
+
+Flagship definitions include an `AbilityCastProfile` with role, animation ID, startup, active, recovery, failure recovery, interruption, movement tolerance, and mastery/evolution metadata. `AbilityVisualPacket` is server-to-client presentation only. See [`ABILITY_QUALITY_PHASE5.md`](ABILITY_QUALITY_PHASE5.md).
 
 ## Lifecycle guarantees
 
@@ -76,7 +86,7 @@ Movement: `dash`, `quicksilver`, `shadow_step`.
 
 Combat: `dagger_mastery`, `mutilation`, `bloodlust`, `area_slash`, `dragons_fear`.
 
-Utility: `stealth`, `rulers_authority` and its mode IDs, `enhanced_senses`.
+Utility: `stealth`, `rulers_authority` and its pull, push, hold, throw, object, dash, and flight mode IDs, `enhanced_senses`.
 
 Monarch: `monarch_domain`, `shadow_exchange`, `shadow_extraction`, `shadow_summoning`.
 

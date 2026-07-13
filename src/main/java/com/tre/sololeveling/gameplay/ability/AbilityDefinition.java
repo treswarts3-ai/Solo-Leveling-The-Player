@@ -12,8 +12,16 @@ public record AbilityDefinition(
         int manaCost,
         int cooldownTicks,
         double maximumRange,
-        AbilityScaling scaling
+        AbilityScaling scaling,
+        AbilityCastProfile castProfile
 ) {
+    public AbilityDefinition(String id, String displayName, String description, String category,
+                             AbilityUnlock unlock, int manaCost, int cooldownTicks, double maximumRange,
+                             AbilityScaling scaling) {
+        this(id, displayName, description, category, unlock, manaCost, cooldownTicks, maximumRange,
+                scaling, AbilityCastProfile.INSTANT);
+    }
+
     public AbilityDefinition {
         id = normalize(id);
         if (id.isBlank()) throw new IllegalArgumentException("Ability id cannot be blank");
@@ -25,6 +33,7 @@ public record AbilityDefinition(
         cooldownTicks = Math.max(0, cooldownTicks);
         maximumRange = Math.max(0.0D, maximumRange);
         scaling = scaling == null ? AbilityScaling.NONE : scaling;
+        castProfile = castProfile == null ? AbilityCastProfile.INSTANT : castProfile;
     }
 
     public double cooldownSeconds() {

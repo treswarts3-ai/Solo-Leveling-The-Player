@@ -1,5 +1,6 @@
 package com.tre.sololeveling.gameplay.ability;
 
+import com.tre.sololeveling.data.HunterData;
 import com.tre.sololeveling.registry.ModSounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
@@ -34,6 +35,8 @@ public final class AbilityEffects {
     /** Deals server-authoritative ability damage while preserving player kill credit. */
     public static boolean dealAbilityDamage(ServerPlayer player, LivingEntity target, float damage, String abilityId) {
         if (!AbilityTargeting.isValidTarget(player, target) || damage <= 0.0F) return false;
+        boolean backstab = HunterData.isStealthed(player) && AbilityTargeting.isBehind(player, target);
+        float resolvedDamage = backstab ? damage * 1.5F : damage;
         beginGeneratedDamage(player, abilityId, true, false);
         CompoundTag targetData = target.getPersistentData();
         targetData.putString(TAG_LAST_ABILITY_ID, AbilityDefinition.normalize(abilityId));
@@ -41,7 +44,12 @@ public final class AbilityEffects {
         targetData.putLong(TAG_LAST_ABILITY_TIME, player.level().getGameTime());
         try {
             target.invulnerableTime = 0;
-            return target.hurt(player.damageSources().playerAttack(player), damage);
+            boolean dealt = target.hurt(player.damageSources().playerAttack(player), resolvedDamage);
+            if (dealt && backstab) {
+                particles(player.serverLevel(), target.position().add(0, target.getBbHeight() * 0.6D, 0),
+                        ParticleTypes.CRIT, 18, 0.32D);
+            }
+            return dealt;
         } finally {
             endGeneratedDamage(player);
         }
@@ -155,6 +163,32 @@ public final class AbilityEffects {
         player.setDeltaMovement(Vec3.ZERO);
         player.fallDistance = 0.0F;
         player.hurtMarked = true;
+        return true;
+    }
+
+    /** Samples the full server path so dash abilities cannot cross solid geometry or unloaded chunks. */
+    public static boolean isClearPath(ServerPlayer player, Vec3 destination) {
+        Vec3 origin = player.position();
+        Vec3 delta = destination.subtract(origin);
+        int samples = Math.max(1, (int)Math.ceil(delta.length() * 2.0D));
+        for (int index = 1; index <= samples; index++) {
+            Vec3 sample = origin.add(delta.scale(index / (double)samples));
+            BlockPos block = BlockPos.containing(sample);
+            if (!player.serverLevel().hasChunkAt(block)
+                    || !player.serverLevel().getWorldBorder().isWithinBounds(block)) return false;
+            AABB moved = player.getBoundingBox().move(sample.subtract(origin));
+            if (!player.serverLevel().noCollision(player, moved)) return false;
+        }
+        return true;
+    }
+
+    /** Applies bounded movement only when the immediate server collision sweep is clear. */
+    public static boolean setSafeClampedVelocity(ServerPlayer player, Vec3 velocity,
+                                                 double maximumHorizontal, double maximumVertical) {
+        Vec3 step = velocity.scale(0.5D);
+        AABB moved = player.getBoundingBox().move(step);
+        if (!player.serverLevel().noCollision(player, moved)) return false;
+        setClampedVelocity(player, velocity, maximumHorizontal, maximumVertical);
         return true;
     }
 

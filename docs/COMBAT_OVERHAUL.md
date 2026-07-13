@@ -1,5 +1,7 @@
 # Combat and Visual Overhaul
 
+> Phase 5 adds readable cast phases, interruption/failure recovery, mastery, combos, deterministic prepared targets, and server-issued animation events. The completion matrix is in [`ABILITY_QUALITY_PHASE5.md`](ABILITY_QUALITY_PHASE5.md).
+
 ## Ability damage safety
 
 Generated ability and equipment damage now use a shared depth-aware guard. The guard preserves normal player kill credit while preventing generated hits from recursively receiving critical, dagger, equipment, daily-attack, or other normal-hit bonuses. Ability hits carry the ability ID, owner UUID, and hit time on the target for future integrations.
@@ -41,7 +43,7 @@ Targeting remains server-authoritative and bounded. Ray targets stop at blocks, 
 
 ### Ruler's Authority
 
-- Pull, push, hold, throw, dash, and flight remain mechanically separate.
+- Pull, push, hold, throw, dropped-object control, dash, and flight remain mechanically separate.
 - Entity velocity is clamped.
 - Bosses strongly resist movement and cannot be suspended.
 - Hold drains mana, ends on obstruction, lost line of sight, excessive distance, death, logout, or dimension change, and lasts only two seconds on players.

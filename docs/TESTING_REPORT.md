@@ -16,6 +16,8 @@ Phase 3 adds Hunter schema-v5 migration/clamping, guarded dungeon lifecycle tran
 
 Phase 4 replaces code-authored dungeon geometry with twelve vanilla structure-template modules, explicit gameplay/presentation markers, strict module/palette validation, independently replaceable in-game NBT exports, and bounded staged placement/owned-volume cleanup. See [`MASTER_DUNGEON_BUILD_GUIDE.md`](MASTER_DUNGEON_BUILD_GUIDE.md).
 
+Phase 5 adds a static quality-contract validator for the eight flagship abilities, server-owned cast timing and target revalidation, interruption/refund paths, server-to-client presentation packets, mastery/combos, multiplayer target protections, and distance-gated effects. See [`ABILITY_QUALITY_PHASE5.md`](ABILITY_QUALITY_PHASE5.md).
+
 ## Code-path checks included
 
 - Player login synchronization
@@ -33,6 +35,9 @@ Phase 4 replaces code-authored dungeon geometry with twelve vanilla structure-te
 - Per-tick template placement and cleanup ceilings
 - Loss-safe full-storage handling and indexed System Inventory retrieval
 - Ability mana and cooldown checks
+- Delayed ability startup, interruption refunds, failure recovery, and resolve-only quest credit
+- Flagship role, animation, timing, feedback, and progression contracts
+- Client visual packet direction and absence of client-owned damage, movement, mana, or cooldown operations
 - Target line raycast and range checks
 - Shadow capacity and duplicate prevention flags
 - Staggered shadow target acquisition and suspended far-distance searches

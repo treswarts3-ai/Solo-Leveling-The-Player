@@ -11,6 +11,8 @@ import com.tre.sololeveling.gameplay.ProgressionHandler;
 import com.tre.sololeveling.gameplay.QuestHandler;
 import com.tre.sololeveling.gameplay.ShadowHandler;
 import com.tre.sololeveling.gameplay.ability.AbilityEffects;
+import com.tre.sololeveling.gameplay.ability.AbilityService;
+import com.tre.sololeveling.gameplay.ability.AbilityTargeting;
 import com.tre.sololeveling.quest.QuestApi;
 import com.tre.sololeveling.quest.QuestManager;
 import net.minecraft.ChatFormatting;
@@ -152,6 +154,7 @@ public final class CommonEvents {
     public void hurt(LivingHurtEvent event) {
         if (event.getEntity() instanceof ServerPlayer victim && HunterData.isAwakened(victim)) {
             HunterData.recordCombat(victim);
+            AbilityService.onDamaged(victim);
             PassiveHandler.breakStealth(victim);
             long bloodlustUntil = HunterData.mutable(victim).getLong("ability_bloodlust_until");
             if (bloodlustUntil > victim.level().getGameTime()) {
@@ -168,8 +171,16 @@ public final class CommonEvents {
         if (event.getSource().getEntity() instanceof ServerPlayer attacker
                 && HunterData.isAwakened(attacker)) {
             HunterData.recordCombat(attacker);
-            PassiveHandler.breakStealth(attacker);
             boolean generatedDamage = AbilityEffects.generatedDamage(attacker);
+            boolean backstab = !generatedDamage && HunterData.isStealthed(attacker)
+                    && AbilityTargeting.isBehind(attacker, event.getEntity());
+            AbilityService.onAttack(attacker);
+            PassiveHandler.breakStealth(attacker);
+            if (backstab) {
+                event.setAmount(event.getAmount() * 1.5F);
+                attacker.displayClientMessage(Component.literal("[BACKSTAB x1.50]")
+                        .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD), true);
+            }
             if (!generatedDamage) QuestHandler.onAttack(attacker);
             if (!generatedDamage
                     && attacker.getRandom().nextDouble() < HunterData.getCriticalChance(attacker)) {

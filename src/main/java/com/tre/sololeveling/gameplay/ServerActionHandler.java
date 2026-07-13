@@ -101,7 +101,7 @@ public final class ServerActionHandler {
         if (action.equals("SUMMON_SHADOW")) { if (allowMutation(player, "summon_shadow", 5L) && ShadowHandler.summonFirst(player)) QuestApi.onShadowSummoned(player, "any"); return; }
         if (action.equals("DISMISS_SHADOWS")) { ShadowHandler.dismissAll(player); return; }
         if (action.equals("SHADOW_MODE")) { ShadowHandler.cycleMode(player); return; }
-        if (action.equals("SHADOW_EXCHANGE")) { ShadowHandler.exchange(player); return; }
+        if (action.equals("SHADOW_EXCHANGE")) { AbilityService.activate(player, "shadow_exchange"); return; }
         if (action.equals("TOGGLE_DOMAIN")) { activateAndTrack(player, "monarch_domain", "monarch_domain"); return; }
         if (action.equals("STORE_HELD")) {
             if (allowMutation(player, "store_held", 4L)) HunterData.storeHeld(player);
@@ -130,11 +130,7 @@ public final class ServerActionHandler {
     }
 
     private static void activateAndTrack(ServerPlayer player, String abilityId, String questId) {
-        int manaBefore = HunterData.getMana(player);
-        if (!AbilityService.activate(player, abilityId)) return;
-        QuestApi.onAbilityUsed(player, questId);
-        QuestApi.onManaSpent(player, Math.max(0, manaBefore - HunterData.getMana(player)));
-        QuestHandler.onAbilityUse(player);
+        AbilityService.activate(player, abilityId);
     }
 
     /** Broad abuse ceiling for every client action packet. */
