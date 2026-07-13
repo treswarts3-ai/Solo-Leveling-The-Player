@@ -219,6 +219,9 @@ public final class DungeonRuntime {
                 fail(server, session, "All hunters left the dungeon");
                 continue;
             }
+            // A short disconnect must not consume the encounter or objective clock. If at
+            // least one party member remains in the arena the run continues normally.
+            if (!memberPresent) continue;
             session.tickTimers();
             if (session.remainingTicks() <= 0) {
                 fail(server, session, "Dungeon timer expired");
@@ -498,7 +501,10 @@ public final class DungeonRuntime {
         DungeonSavedData data = DungeonSavedData.get(server);
         DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
         session.setState(DungeonTypes.SessionState.COMPLETED);
-        session.setCleanupAfterGameTime(server.overworld().getGameTime() + 20L * 20L);
+        // Keep the completed session available long enough for a disconnected party
+        // member to rejoin, receive their exactly-once reward, and recover their return
+        // point. Twenty seconds made ordinary reconnects lose that recovery path.
+        session.setCleanupAfterGameTime(server.overworld().getGameTime() + 20L * 60L * 5L);
         if (!session.rewardGranted() && template != null) {
             session.setRewardGranted(true);
             data.setDirty();
@@ -507,7 +513,7 @@ public final class DungeonRuntime {
                 grantRewardIfPending(player, session, template, data);
             }
         }
-        broadcast(server, session, "[DUNGEON CLEAR] Rewards granted. Exit is available for 20 seconds.", ChatFormatting.GOLD);
+        broadcast(server, session, "[DUNGEON CLEAR] Rewards granted. Reconnect recovery remains available for 5 minutes.", ChatFormatting.GOLD);
         DungeonHooks.post(new DungeonHooks.DungeonCompletedEvent(session));
         data.setDirty();
     }
