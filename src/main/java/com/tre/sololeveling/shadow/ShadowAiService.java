@@ -100,6 +100,11 @@ public final class ShadowAiService {
         if (!validTarget(owner, target)) target = owner.getLastHurtByMob();
         if (validTarget(owner, target)) return target;
         if (mode != Mode.GUARD && mode != Mode.AGGRESSIVE) return null;
+        // Autonomous acquisition is the expensive part of shadow AI. Keep immediate
+        // owner combat reactions, but stagger local searches across four update groups
+        // and suspend them while a shadow is far enough away to be recovering to owner.
+        if (shadow.distanceToSqr(owner) > 32.0D * 32.0D
+                || Math.floorMod(shadow.getId(), 4) != Math.floorMod(owner.tickCount / 5, 4)) return null;
         double range = mode == Mode.AGGRESSIVE ? 18.0D : 10.0D;
         AABB area = shadow.getBoundingBox().inflate(range);
         return owner.serverLevel().getEntitiesOfClass(LivingEntity.class, area,

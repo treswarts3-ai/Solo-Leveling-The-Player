@@ -2,6 +2,7 @@ package com.tre.sololeveling.data;
 
 import com.tre.sololeveling.network.ModNetwork;
 import com.tre.sololeveling.config.ModConfigs;
+import com.tre.sololeveling.dungeon.DungeonRuntime;
 import com.tre.sololeveling.network.packet.SyncHunterDataPacket;
 import com.tre.sololeveling.gameplay.ProgressionFormulas;
 import com.tre.sololeveling.equipment.EquipmentEffects;
@@ -180,6 +181,7 @@ public final class HunterData {
         copy.putInt("evasion_chance_permille", (int)Math.round(getEvasionChance(player) * 1000.0D));
         copy.putInt("health_regen_milli", Math.round(getHealthRegenPerSecond(player) * 1000.0F));
         copy.putInt("mana_regen", getManaRegenPerSecond(player));
+        if (player instanceof ServerPlayer serverPlayer) DungeonRuntime.appendSnapshot(serverPlayer, copy);
         return copy;
     }
     public static CompoundTag mutable(ServerPlayer player) { return raw(player); }

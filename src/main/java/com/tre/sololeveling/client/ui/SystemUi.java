@@ -147,7 +147,20 @@ public final class SystemUi {
         }
 
         public String dungeonStatus() {
-            if (tag.getBoolean("dungeon_active")) return text("dungeon_name", "Dungeon run active");
+            if (tag.getBoolean("dungeon_active")) {
+                String name = text("dungeon_name", "Dungeon run active");
+                String state = tag.getString("dungeon_state");
+                if (!state.equals("active")) return name + " - " + titleCase(state);
+                String objective = tag.getString("dungeon_objective");
+                if (!objective.isBlank()) {
+                    int progress = Math.max(0, tag.getInt("dungeon_objective_progress"));
+                    int target = Math.max(0, tag.getInt("dungeon_objective_target"));
+                    return name + " - " + objective + (target > 0 ? " " + progress + "/" + target : "");
+                }
+                return name;
+            }
+            if (tag.getString("dungeon_state").equals("completed")) return "Dungeon cleared - recovery available";
+            if (tag.getString("dungeon_state").equals("failed")) return "Dungeon failed - safe return available";
             if (tag.getBoolean("dungeon_gate_nearby")) return "Gate detected nearby";
             return "No active dungeon";
         }
@@ -284,9 +297,36 @@ public final class SystemUi {
             String cleanDetail = detail == null ? "" : detail;
             Notification newest = QUEUE.peekLast();
             if (newest != null && newest.kind == kind && newest.title.equals(cleanTitle) && newest.detail.equals(cleanDetail)) return;
-            QUEUE.addLast(new Notification(kind, cleanTitle, cleanDetail, durationMs));
-            while (QUEUE.size() > 12) QUEUE.removeFirst();
+            Notification incoming = new Notification(kind, cleanTitle, cleanDetail, durationMs);
+            List<Notification> ordered = new ArrayList<>(QUEUE);
+            int insertion = ordered.size();
+            // Do not interrupt a notification already being displayed. Everything behind
+            // it follows the documented System priority while remaining stable within a tier.
+            int firstMovable = !ordered.isEmpty() && ordered.get(0).startedAt > 0L ? 1 : 0;
+            for (int i = firstMovable; i < ordered.size(); i++) {
+                if (priority(kind) < priority(ordered.get(i).kind)) {
+                    insertion = i;
+                    break;
+                }
+            }
+            ordered.add(insertion, incoming);
+            QUEUE.clear();
+            QUEUE.addAll(ordered);
+            while (QUEUE.size() > 12) QUEUE.removeLast();
             playFeedback(kind);
+        }
+
+        private static int priority(NotificationKind kind) {
+            return switch (kind) {
+                case LEVEL_UP -> 1;
+                case SKILL_UNLOCK -> 2;
+                case QUEST_COMPLETE -> 3;
+                case RANK_ADVANCEMENT -> 4;
+                case DUNGEON -> 5;
+                case ITEM_OBTAINED -> 6;
+                case ERROR, QUEST_FAILED -> 7;
+                default -> 8;
+            };
         }
 
         private static void playFeedback(NotificationKind kind) {

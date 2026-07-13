@@ -219,6 +219,9 @@ public final class DungeonRuntime {
                 fail(server, session, "All hunters left the dungeon");
                 continue;
             }
+            // A short disconnect must not consume the encounter or objective clock. If at
+            // least one party member remains in the arena the run continues normally.
+            if (!memberPresent) continue;
             session.tickTimers();
             if (session.remainingTicks() <= 0) {
                 fail(server, session, "Dungeon timer expired");
@@ -498,7 +501,10 @@ public final class DungeonRuntime {
         DungeonSavedData data = DungeonSavedData.get(server);
         DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
         session.setState(DungeonTypes.SessionState.COMPLETED);
-        session.setCleanupAfterGameTime(server.overworld().getGameTime() + 20L * 20L);
+        // Keep the completed session available long enough for a disconnected party
+        // member to rejoin, receive their exactly-once reward, and recover their return
+        // point. Twenty seconds made ordinary reconnects lose that recovery path.
+        session.setCleanupAfterGameTime(server.overworld().getGameTime() + 20L * 60L * 5L);
         if (!session.rewardGranted() && template != null) {
             session.setRewardGranted(true);
             data.setDirty();
@@ -507,7 +513,7 @@ public final class DungeonRuntime {
                 grantRewardIfPending(player, session, template, data);
             }
         }
-        broadcast(server, session, "[DUNGEON CLEAR] Rewards granted. Exit is available for 20 seconds.", ChatFormatting.GOLD);
+        broadcast(server, session, "[DUNGEON CLEAR] Rewards granted. Reconnect recovery remains available for 5 minutes.", ChatFormatting.GOLD);
         DungeonHooks.post(new DungeonHooks.DungeonCompletedEvent(session));
         data.setDirty();
     }
@@ -529,7 +535,28 @@ public final class DungeonRuntime {
             Item item = ForgeRegistries.ITEMS.getValue(itemReward.itemId());
             if (item == null || item == Items.AIR) continue;
             ItemStack stack = new ItemStack(item, itemReward.count());
-            if (!player.getInventory().add(stack)) player.drop(stack, false);
+            if (!player.getInventory().add(stack)) {
+                // Dungeon loot must not depend on a temporary world drop. The persistent
+                // System inventory is the loss-safe overflow path used by the rest of the mod.
+                // ItemStack#copy is intentional because inventory insertion may mutate stack.
+                ItemStack overflow = stack.copy();
+                if (!overflow.isEmpty() && !HunterData.storeSystemItem(player, overflow)) {
+                    // Both inventories being full is visible and recoverable, but never silent.
+                    // Retain vanilla ownership protection as the final fallback.
+                    var dropped = player.drop(overflow, false);
+                    if (dropped != null) {
+                        dropped.setPickUpDelay(0);
+                        dropped.setExtendedLifetime();
+                    }
+                    player.sendSystemMessage(Component.literal(
+                                    "[SYSTEM] Reward storage is full. Loot was placed at your feet.")
+                            .withStyle(ChatFormatting.RED));
+                } else if (!overflow.isEmpty()) {
+                    player.sendSystemMessage(Component.literal(
+                                    "[SYSTEM] Inventory full. Dungeon loot moved to System storage.")
+                            .withStyle(ChatFormatting.GOLD));
+                }
+            }
         }
         HunterData.sync(player);
         try {
@@ -774,6 +801,27 @@ public final class DungeonRuntime {
             if (session.contains(playerId)) return session;
         }
         return null;
+    }
+
+    /** Adds server-authoritative dungeon state to the normal Hunter data snapshot. */
+    public static void appendSnapshot(ServerPlayer player, CompoundTag snapshot) {
+        DungeonSession session = findSession(player.server, player.getUUID());
+        if (session == null) {
+            snapshot.putBoolean("dungeon_active", false);
+            snapshot.putString("dungeon_state", "none");
+            snapshot.putString("dungeon_name", "");
+            snapshot.putString("dungeon_objective", "");
+            return;
+        }
+        DungeonTypes.DungeonTemplate template = DungeonContent.template(session.templateId());
+        DungeonTypes.ObjectiveDefinition objective = session.currentObjective(template);
+        snapshot.putBoolean("dungeon_active", !session.isTerminal());
+        snapshot.putString("dungeon_state", session.state().name().toLowerCase(java.util.Locale.ROOT));
+        snapshot.putString("dungeon_name", template == null ? session.templateId() : template.displayName());
+        snapshot.putString("dungeon_objective", objective == null ? "" : objective.displayName());
+        snapshot.putInt("dungeon_objective_progress", session.objectiveProgress());
+        snapshot.putInt("dungeon_objective_target", objective == null ? 0 : objective.target());
+        snapshot.putInt("dungeon_time_seconds", Math.max(0, session.remainingTicks() / 20));
     }
 
     public static String inspect(MinecraftServer server, DungeonSession session) {

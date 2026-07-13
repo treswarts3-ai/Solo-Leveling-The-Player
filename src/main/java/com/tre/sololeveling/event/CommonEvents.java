@@ -53,6 +53,10 @@ public final class CommonEvents {
     @SubscribeEvent
     public void login(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
+            // Clear persisted transient ability state left by a hard server stop before
+            // sending the first authoritative snapshot to the client.
+            PassiveHandler.breakStealth(player);
+            AbilityHandler.cancel(player);
             HunterData.initialize(player);
             QuestManager.onLogin(player);
         }

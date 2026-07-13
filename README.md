@@ -37,7 +37,7 @@ The compiled mod is produced in `build/libs/`.
 - Daily exercises, penalty flow, tutorial, Job Change, Shadow Mastery, Black Heart, and emergency progression
 - Stealth, Bloodlust, Quicksilver, Mutilation, Dagger Rush, Ruler's Authority, Dragon's Fear, and every registered active ability
 - Shadow extraction, storage, summon, dismissal, AI modes, Shadow Exchange, and Monarch's Domain
-- Persistent gates and four authored underground dungeon maps with objectives, timers, recovery, rewards, enemies, elites, and bosses
+- Persistent, animated rank-colored gates, four legacy underground maps, and the primary Abyssal Necropolis master dungeon with staged generation, objectives, recovery, rewards, enemies, elites, and a boss
 - Signature weapons, armor, accessories, equipment sets, runes, keys, potions, materials, and story items
 - Original generated PNG textures, editable HTML pixel-art sources, particles, OGG sounds, and original System UI icon assets
 
@@ -84,3 +84,5 @@ This repository is structured for parallel development through isolated feature 
 ## Release status
 
 Version 1.0.0 is a compiled development prerelease. Automated Forge builds pass, but gameplay balance, long-session persistence, dedicated-server runtime behavior, multiplayer stress, and final visual acceptance still require hands-on testing.
+
+The authoritative release gate and manual test procedure are in [`docs/ACCEPTANCE_TESTS.md`](docs/ACCEPTANCE_TESTS.md). A feature being implemented or compile-verified does not count as runtime acceptance.
