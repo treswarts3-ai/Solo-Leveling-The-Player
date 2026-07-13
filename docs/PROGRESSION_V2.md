@@ -24,6 +24,8 @@ The System quest screen displays current and target values and exposes only the 
 
 The starting targets remain 8 kills, 600 sprint blocks, 20 attacks, 15 jumps, and 5 abilities. Together they require several types of normal play without making the first daily dependent on dungeon access.
 
+Penalty transfer builds its isolated 25x25 survival arena over bounded batches of at most 512 placement operations per server tick. The build index and target dimension persist through reconnect; the player is teleported and the 60-second survival clock begins only after construction finishes. `/sl penalty return` safely cancels an unfinished transfer.
+
 ## Five-level growth choices
 
 Beginning at level 5, every five levels queues one persistent growth selection. Existing characters receive all earned selections that were not previously tracked, up to the safety cap. Multiple pending choices are handled one at a time.

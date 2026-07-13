@@ -31,6 +31,8 @@ public final class QuestHandler {
     private static final int DAILY_ATTACKS = 20;
     private static final int DAILY_JUMPS = 15;
     private static final int DAILY_ABILITIES = 5;
+    private static final int PENALTY_BUILD_OPERATIONS = 4_290;
+    private static final int PENALTY_BUILD_PER_TICK = 512;
 
     public static void tick(ServerPlayer player) {
         QuestManager.tick(player);
@@ -38,6 +40,11 @@ public final class QuestHandler {
         if (!HunterData.isAwakened(player)) return;
         ProgressionHandler.tick(player);
         resetActivityDailyIfNeeded(player, tag);
+
+        if (tag.getBoolean("penalty_building")) {
+            tickPenaltyBuild(player, tag);
+            return;
+        }
 
         if (tag.getBoolean("penalty_pending") && !tag.getBoolean("penalty_active") && player.tickCount % 100 == 0) {
             tag.putBoolean("penalty_pending", false);
@@ -183,8 +190,9 @@ public final class QuestHandler {
 
     public static void sendToPenalty(ServerPlayer player) {
         CompoundTag tag = HunterData.mutable(player);
-        if (tag.getBoolean("penalty_active")) return;
-        tag.putBoolean("penalty_active", true);
+        if (tag.getBoolean("penalty_active") || tag.getBoolean("penalty_building")) return;
+        tag.putBoolean("penalty_building", true);
+        tag.putBoolean("penalty_active", false);
         tag.putString("penalty_return_dimension", player.level().dimension().location().toString());
         tag.putDouble("penalty_return_x", player.getX());
         tag.putDouble("penalty_return_y", player.getY());
@@ -193,15 +201,25 @@ public final class QuestHandler {
         int baseX = 100000 + offset;
         int baseZ = 100000 + offset;
         int baseY = 120;
-        buildPenaltyArena(player.serverLevel(), baseX, baseY, baseZ);
-        player.teleportTo(player.serverLevel(), baseX + 0.5D, baseY + 1.0D, baseZ + 0.5D, player.getYRot(), player.getXRot());
-        tag.putLong("penalty_end", player.level().getGameTime() + 20L * 60L);
-        player.sendSystemMessage(Component.literal("[PENALTY QUEST] Survive for 60 seconds.").withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+        tag.putInt("penalty_arena_x", baseX);
+        tag.putInt("penalty_arena_y", baseY);
+        tag.putInt("penalty_arena_z", baseZ);
+        tag.putInt("penalty_build_index", 0);
+        tag.putString("penalty_arena_dimension", player.level().dimension().location().toString());
+        player.sendSystemMessage(Component.literal("[SYSTEM] Constructing penalty arena in bounded server-tick batches...")
+                .withStyle(ChatFormatting.RED));
         HunterData.sync(player);
     }
 
     public static void returnFromPenalty(ServerPlayer player) {
         CompoundTag tag = HunterData.mutable(player);
+        if (tag.getBoolean("penalty_building")) {
+            tag.putBoolean("penalty_building", false);
+            tag.putInt("penalty_build_index", 0);
+            player.sendSystemMessage(Component.literal("[SYSTEM] Penalty transfer canceled.").withStyle(ChatFormatting.GRAY));
+            HunterData.sync(player);
+            return;
+        }
         if (!tag.getBoolean("penalty_active")) return;
         ResourceLocation dimensionId = ResourceLocation.tryParse(tag.getString("penalty_return_dimension"));
         ServerLevel target = null;
@@ -226,21 +244,56 @@ public final class QuestHandler {
         HunterData.sync(player);
     }
 
-    private static void buildPenaltyArena(ServerLevel level, int x, int y, int z) {
-        for (int dx = -12; dx <= 12; dx++) {
-            for (int dz = -12; dz <= 12; dz++) {
-                level.setBlock(new BlockPos(x + dx, y, z + dz), Blocks.SMOOTH_SANDSTONE.defaultBlockState(), 3);
-                for (int dy = 1; dy <= 5; dy++) level.setBlock(new BlockPos(x + dx, y + dy, z + dz), Blocks.AIR.defaultBlockState(), 3);
-            }
+    private static void tickPenaltyBuild(ServerPlayer player, CompoundTag tag) {
+        ResourceLocation dimensionId = ResourceLocation.tryParse(tag.getString("penalty_arena_dimension"));
+        ServerLevel level = dimensionId == null || player.getServer() == null ? null
+                : player.getServer().getLevel(ResourceKey.create(Registries.DIMENSION, dimensionId));
+        if (level == null) {
+            tag.putBoolean("penalty_building", false);
+            player.sendSystemMessage(Component.literal("[SYSTEM] Penalty arena dimension is unavailable.").withStyle(ChatFormatting.RED));
+            HunterData.sync(player);
+            return;
         }
-        for (int i = -13; i <= 13; i++) {
-            for (int dy = 1; dy <= 5; dy++) {
-                level.setBlock(new BlockPos(x - 13, y + dy, z + i), Blocks.BARRIER.defaultBlockState(), 3);
-                level.setBlock(new BlockPos(x + 13, y + dy, z + i), Blocks.BARRIER.defaultBlockState(), 3);
-                level.setBlock(new BlockPos(x + i, y + dy, z - 13), Blocks.BARRIER.defaultBlockState(), 3);
-                level.setBlock(new BlockPos(x + i, y + dy, z + 13), Blocks.BARRIER.defaultBlockState(), 3);
-            }
+        int index = Math.max(0, tag.getInt("penalty_build_index"));
+        int end = Math.min(PENALTY_BUILD_OPERATIONS, index + PENALTY_BUILD_PER_TICK);
+        int x = tag.getInt("penalty_arena_x"), y = tag.getInt("penalty_arena_y"), z = tag.getInt("penalty_arena_z");
+        for (; index < end; index++) placePenaltyOperation(level, x, y, z, index);
+        tag.putInt("penalty_build_index", index);
+        if (index < PENALTY_BUILD_OPERATIONS) return;
+
+        tag.putBoolean("penalty_building", false);
+        tag.putBoolean("penalty_active", true);
+        tag.putLong("penalty_end", level.getGameTime() + 20L * 60L);
+        player.teleportTo(level, x + 0.5D, y + 1.0D, z + 0.5D, player.getYRot(), player.getXRot());
+        player.sendSystemMessage(Component.literal("[PENALTY QUEST] Survive for 60 seconds.")
+                .withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+        HunterData.sync(player);
+    }
+
+    private static void placePenaltyOperation(ServerLevel level, int x, int y, int z, int index) {
+        BlockPos position;
+        if (index < 3_750) {
+            int cell = index / 6;
+            int layer = index % 6;
+            int dx = cell / 25 - 12;
+            int dz = cell % 25 - 12;
+            position = new BlockPos(x + dx, y + layer, z + dz);
+            level.setBlock(position, layer == 0 ? Blocks.SMOOTH_SANDSTONE.defaultBlockState()
+                    : Blocks.AIR.defaultBlockState(), 2);
+            return;
         }
+        int wall = index - 3_750;
+        int point = wall / 4;
+        int side = wall % 4;
+        int i = point / 5 - 13;
+        int dy = point % 5 + 1;
+        position = switch (side) {
+            case 0 -> new BlockPos(x - 13, y + dy, z + i);
+            case 1 -> new BlockPos(x + 13, y + dy, z + i);
+            case 2 -> new BlockPos(x + i, y + dy, z - 13);
+            default -> new BlockPos(x + i, y + dy, z + 13);
+        };
+        level.setBlock(position, Blocks.BARRIER.defaultBlockState(), 2);
     }
 
     private static void spawnPenaltyMob(ServerPlayer player) {
