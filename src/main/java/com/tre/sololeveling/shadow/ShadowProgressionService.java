@@ -43,9 +43,11 @@ public final class ShadowProgressionService {
         ShadowStorage.Rank oldRank = ShadowStorage.rank(record);
         ShadowStorage.Rank newRank = rankForLevel(level, oldRank);
         record.putString("rank", newRank.display());
+        record.putBoolean("evolution_eligible", level >= 50 && newRank.ordinal() < ShadowStorage.Rank.COMMANDER.ordinal());
         if (level > oldLevel) {
             owner.sendSystemMessage(Component.literal("[SHADOW] " + record.getString("name") + " reached level " + level + ".")
                     .withStyle(ChatFormatting.DARK_PURPLE));
+            com.tre.sololeveling.quest.QuestApi.onShadowDeveloped(owner, "level");
         }
         if (newRank != oldRank) {
             owner.sendSystemMessage(Component.literal("[SHADOW] " + record.getString("name") + " advanced to " + newRank.display() + ".")
@@ -62,6 +64,7 @@ public final class ShadowProgressionService {
         if (recordId == null || !ShadowSummoningService.isOwnedBy(shadow, owner.getUUID())) return;
         int reward = Math.max(1, (int)Math.ceil(victim.getMaxHealth() / 4.0D + victim.getArmorValue()));
         addXp(owner, recordId.toString(), reward);
+        ShadowTraitService.onKill(owner, shadow);
     }
 
     public static void onShadowDeath(ServerPlayer owner, Entity shadow) {

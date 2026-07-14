@@ -147,6 +147,9 @@ public final class ShadowHandler {
 
     public static void cycleMode(ServerPlayer player) { ShadowAiService.cycleMode(player); }
     public static void setMode(ServerPlayer player, int value) { ShadowAiService.setMode(player, value); }
+    public static void command(ServerPlayer player, ShadowAiService.Mode mode) { ShadowAiService.command(player, mode); }
+    public static void returnAll(ServerPlayer player) { ShadowAiService.returnAll(player); }
+    public static void cycleFormation(ServerPlayer player) { ShadowAiService.cycleFormation(player); }
 
     public static void tick(ServerPlayer owner) {
         if (owner.tickCount % 100 == 0) ShadowExtractionService.cleanup(owner);

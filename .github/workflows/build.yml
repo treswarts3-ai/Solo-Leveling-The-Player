@@ -67,6 +67,10 @@ jobs:
         shell: bash
         run: python tools/validate_ability_quality.py
 
+      - name: Validate Phases 6–8 quality contracts
+        shell: bash
+        run: python tools/validate_phases_6_8.py
+
       - name: Build Forge mod
         shell: bash
         run: |

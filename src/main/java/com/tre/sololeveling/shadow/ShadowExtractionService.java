@@ -149,6 +149,12 @@ public final class ShadowExtractionService {
         record.putInt("xp", 0);
         record.putBoolean("active", false);
         record.putString("active_entity", "");
+        ResourceLocation type = ResourceLocation.tryParse(target.getString("type"));
+        record.putString("owner_id", owner.getUUID().toString());
+        record.putString("role", type != null && (type.getPath().contains("skeleton") || type.getPath().contains("pillager"))
+                ? "RANGED" : type != null && (type.getPath().contains("evoker") || type.getPath().contains("witch"))
+                ? "CASTER" : type != null && (type.getPath().contains("ravager") || type.getPath().contains("golem"))
+                ? "GUARDIAN" : type != null && type.getPath().contains("spider") ? "ASSASSIN" : "VANGUARD");
         return record;
     }
 

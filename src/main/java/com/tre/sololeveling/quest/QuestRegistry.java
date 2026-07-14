@@ -142,6 +142,36 @@ public final class QuestRegistry {
                 .prerequisite("sololeveling:shadow_system_introduction")
                 .objective("summons", QuestObjectiveType.SHADOW_SUMMON, "any", 3, "Summon 3 shadows")
                 .reward(QuestReward.builder().xp(750).gold(500).build()).build());
+
+        register(QuestDefinition.builder("sololeveling:repeat_role_hunt", "Tactical Role Hunt")
+                .description("Read enemy behavior and defeat specialists, not generic targets.")
+                .category(QuestCategory.REPEATABLE).repeatable()
+                .prerequisite("sololeveling:first_dungeon")
+                .objective("assassins", QuestObjectiveType.ENEMY_ROLE, "assassin", 3, "Defeat 3 assassin-role enemies")
+                .objective("summoners", QuestObjectiveType.ENEMY_ROLE, "summoner", 1, "Interrupt and defeat a summoner")
+                .reward(QuestReward.builder().xp(900).gold(600).build()).build());
+
+        register(QuestDefinition.builder("sololeveling:repeat_dungeon_scholar", "Hidden Routes")
+                .description("Search authored dungeon routes for secrets or shortcuts.")
+                .category(QuestCategory.REPEATABLE).repeatable()
+                .prerequisite("sololeveling:first_dungeon")
+                .objective("secret", QuestObjectiveType.SECRET_DISCOVERY, "any", 1, "Discover a secret or shortcut")
+                .reward(QuestReward.builder().xp(700).gold(550).build()).build());
+
+        register(QuestDefinition.builder("sololeveling:repeat_combat_style", "System Combat Analysis")
+                .description("Resolve abilities successfully during real combat.")
+                .category(QuestCategory.REPEATABLE).repeatable()
+                .prerequisite("sololeveling:skill_unlock")
+                .objective("ability_style", QuestObjectiveType.COMBAT_STYLE, "ability", 8, "Land 8 successful ability actions")
+                .reward(QuestReward.builder().xp(800).gold(450).build()).build());
+
+        register(QuestDefinition.builder("sololeveling:repeat_arms_development", "Arms Development")
+                .description("Make a deliberate gear and shadow development decision.")
+                .category(QuestCategory.REPEATABLE).repeatable()
+                .prerequisite("sololeveling:equipment_reward")
+                .objective("upgrade", QuestObjectiveType.EQUIPMENT_UPGRADE, "any", 1, "Upgrade one equipment item")
+                .objective("shadow_level", QuestObjectiveType.SHADOW_DEVELOPMENT, "level", 1, "Develop a shadow")
+                .reward(QuestReward.builder().xp(950).gold(700).build()).build());
     }
 
     private QuestRegistry() { }

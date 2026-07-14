@@ -45,10 +45,14 @@ public final class IntegrationBootstrap {
             QuestApi.onAbilityUsed(player, questId);
             QuestApi.onManaSpent(player, manaSpent);
             QuestHandler.onAbilityUse(player);
+            QuestApi.onCombatStyle(player, "ability");
+            com.tre.sololeveling.gameplay.RankTrialService.onAbilitySuccess(player);
         });
 
-        DungeonHooks.registerRewardHook((player, session, template) ->
-                QuestApi.onDungeonCleared(player, template.id()));
+        DungeonHooks.registerRewardHook((player, session, template) -> {
+            QuestApi.onDungeonCleared(player, template.id());
+            com.tre.sololeveling.gameplay.RankTrialService.onDungeonClear(player, session);
+        });
     }
 
     private IntegrationBootstrap() {}

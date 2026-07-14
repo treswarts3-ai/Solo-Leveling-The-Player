@@ -108,9 +108,10 @@ public final class DungeonEnemies {
     private static Mob create(ServerLevel level, DungeonTypes.EnemyDefinition definition) {
         return switch (definition.kind()) {
             case MELEE -> EntityType.ZOMBIE.create(level);
-            case FAST -> EntityType.CAVE_SPIDER.create(level);
+            case ASSASSIN -> EntityType.CAVE_SPIDER.create(level);
             case TANK -> EntityType.RAVAGER.create(level);
             case RANGED -> EntityType.SKELETON.create(level);
+            case SUMMONER -> EntityType.EVOKER.create(level);
             case ELITE -> EntityType.VINDICATOR.create(level);
         };
     }

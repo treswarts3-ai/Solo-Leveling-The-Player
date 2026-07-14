@@ -23,6 +23,11 @@ public final class EquipmentTooltips {
         }
         tooltip.add(Component.translatable("tooltip.sololeveling.upgrade", upgrade, definition.maxUpgrade())
                 .withStyle(upgrade >= definition.maxUpgrade() ? ChatFormatting.GOLD : ChatFormatting.AQUA));
+        tooltip.add(Component.literal("Level " + definition.minimumLevel() + "–" + definition.maximumLevel()
+                + " | Budget " + definition.statBudget() + " | Sell " + definition.sellValue() + "G")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        if (upgrade < definition.maxUpgrade()) tooltip.add(Component.literal("Next upgrade: "
+                + definition.upgradeCost(upgrade) + "G + catalyst").withStyle(ChatFormatting.GRAY));
 
         double multiplier = safeUpgradeMultiplier();
         for (StatBonus bonus : definition.bonuses()) {

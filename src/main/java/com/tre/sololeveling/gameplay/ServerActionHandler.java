@@ -101,6 +101,12 @@ public final class ServerActionHandler {
         if (action.equals("SUMMON_SHADOW")) { if (allowMutation(player, "summon_shadow", 5L) && ShadowHandler.summonFirst(player)) QuestApi.onShadowSummoned(player, "any"); return; }
         if (action.equals("DISMISS_SHADOWS")) { ShadowHandler.dismissAll(player); return; }
         if (action.equals("SHADOW_MODE")) { ShadowHandler.cycleMode(player); return; }
+        if (action.equals("SHADOW_FOLLOW")) { ShadowHandler.command(player, com.tre.sololeveling.shadow.ShadowAiService.Mode.FOLLOW); return; }
+        if (action.equals("SHADOW_GUARD")) { ShadowHandler.command(player, com.tre.sololeveling.shadow.ShadowAiService.Mode.GUARD); return; }
+        if (action.equals("SHADOW_ATTACK")) { ShadowHandler.command(player, com.tre.sololeveling.shadow.ShadowAiService.Mode.AGGRESSIVE); return; }
+        if (action.equals("SHADOW_HOLD")) { ShadowHandler.command(player, com.tre.sololeveling.shadow.ShadowAiService.Mode.HOLD_POSITION); return; }
+        if (action.equals("SHADOW_RETURN")) { ShadowHandler.returnAll(player); return; }
+        if (action.equals("SHADOW_FORMATION")) { ShadowHandler.cycleFormation(player); return; }
         if (action.equals("SHADOW_EXCHANGE")) { AbilityService.activate(player, "shadow_exchange"); return; }
         if (action.equals("TOGGLE_DOMAIN")) { activateAndTrack(player, "monarch_domain", "monarch_domain"); return; }
         if (action.equals("STORE_HELD")) {

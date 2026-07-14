@@ -43,7 +43,7 @@ public final class DungeonTypes {
     /** Persisted lifecycle states. Keep names stable; old CLEANUP records migrate to CLEANING. */
     public enum SessionState { WAITING, BUILDING, READY, ACTIVE, BOSS, REWARD, COMPLETED, FAILED, CLEANING, CLOSED }
     public enum ObjectiveType { WAVE, COLLECTION, ELITE, BOSS, REWARD }
-    public enum EnemyKind { MELEE, FAST, TANK, RANGED, ELITE }
+    public enum EnemyKind { MELEE, ASSASSIN, TANK, RANGED, SUMMONER, ELITE }
 
     public record SpawnEntry(String enemyId, int count) {
         public SpawnEntry { enemyId = id(enemyId); count = Math.max(1, Math.min(32, count)); }

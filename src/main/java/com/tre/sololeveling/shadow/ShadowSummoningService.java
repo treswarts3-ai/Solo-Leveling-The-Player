@@ -34,6 +34,8 @@ public final class ShadowSummoningService {
     public static final String TAG_RECORD = "sl_shadow_record";
     public static final String TAG_LEVEL = "sl_shadow_level";
     public static final String TAG_RANK = "sl_shadow_rank";
+    public static final String TAG_ROLE = "sl_shadow_role";
+    public static final String TAG_TRAIT = "sl_shadow_trait";
 
     public static boolean summonFirst(ServerPlayer owner) {
         CompoundTag record = ShadowStorage.firstInactive(owner);
@@ -87,7 +89,11 @@ public final class ShadowSummoningService {
         data.putUUID(TAG_RECORD, recordId);
         data.putInt(TAG_LEVEL, Math.max(1, record.getInt("level")));
         data.putString(TAG_RANK, ShadowStorage.rank(record).display());
-        mob.setCustomName(Component.literal(record.getString("name")).withStyle(ChatFormatting.DARK_PURPLE));
+        data.putString(TAG_ROLE, ShadowStorage.role(record).name());
+        data.putString(TAG_TRAIT, ShadowStorage.trait(record).name());
+        data.putString("sl_owner_name", owner.getScoreboardName());
+        mob.setCustomName(Component.literal(record.getString("name") + " 〔" + owner.getScoreboardName() + "〕")
+                .withStyle(ChatFormatting.DARK_PURPLE));
         mob.setCustomNameVisible(true);
         mob.setPersistenceRequired();
         mob.setCanPickUpLoot(false);
@@ -99,7 +105,7 @@ public final class ShadowSummoningService {
         ShadowStorage.markActive(owner, record, mob.getUUID());
         addActiveId(owner, mob.getUUID());
         HunterData.mutable(owner).putBoolean("shadow_summoned_once", true);
-        owner.serverLevel().sendParticles(ParticleTypes.REVERSE_PORTAL, mob.getX(), mob.getY() + 0.5D, mob.getZ(), 60, 0.6D, 0.8D, 0.6D, 0.2D);
+        owner.serverLevel().sendParticles(ParticleTypes.REVERSE_PORTAL, mob.getX(), mob.getY() + 0.5D, mob.getZ(), 24, 0.6D, 0.8D, 0.6D, 0.12D);
         owner.level().playSound(null, owner.blockPosition(), ModSounds.SHADOW.get(), SoundSource.PLAYERS, 0.9F, 1.0F);
         HunterData.sync(owner);
         return true;

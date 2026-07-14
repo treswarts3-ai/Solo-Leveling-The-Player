@@ -29,6 +29,12 @@ public final class QuestApi {
     public static void onSystemOpened(ServerPlayer player) { QuestManager.onSystemOpened(player); }
     public static void onExercise(ServerPlayer player, String exercise, int amount) { QuestManager.onExercise(player, exercise, amount); }
     public static void onDistanceMoved(ServerPlayer player, int blocks) { QuestManager.onDistanceMoved(player, blocks); }
+    public static void onEnemyRole(ServerPlayer player, String role) { QuestManager.onEnemyRole(player, role); }
+    public static void onEncounterConstraint(ServerPlayer player, String constraint) { QuestManager.onEncounterConstraint(player, constraint); }
+    public static void onSecretDiscovered(ServerPlayer player, String secret) { QuestManager.onSecretDiscovered(player, secret); }
+    public static void onShadowDeveloped(ServerPlayer player, String event) { QuestManager.onShadowDeveloped(player, event); }
+    public static void onEquipmentUpgraded(ServerPlayer player, String rarity) { QuestManager.onEquipmentUpgraded(player, rarity); }
+    public static void onCombatStyle(ServerPlayer player, String style) { QuestManager.onCombatStyle(player, style); }
 
     public static void registerListener(QuestNotificationListener listener) { if (listener != null) LISTENERS.add(listener); }
     public static void unregisterListener(QuestNotificationListener listener) { LISTENERS.remove(listener); }
