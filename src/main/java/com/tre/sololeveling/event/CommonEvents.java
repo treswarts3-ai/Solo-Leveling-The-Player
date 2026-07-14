@@ -9,6 +9,7 @@ import com.tre.sololeveling.gameplay.PassiveHandler;
 import com.tre.sololeveling.gameplay.ProgressionChoiceHandler;
 import com.tre.sololeveling.gameplay.ProgressionHandler;
 import com.tre.sololeveling.gameplay.QuestHandler;
+import com.tre.sololeveling.gameplay.RankTrialService;
 import com.tre.sololeveling.gameplay.ShadowHandler;
 import com.tre.sololeveling.gameplay.ability.AbilityEffects;
 import com.tre.sololeveling.gameplay.ability.AbilityService;
@@ -28,12 +29,20 @@ import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
+import net.minecraftforge.event.entity.living.LivingHealEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
 
 public final class CommonEvents {
+    @SubscribeEvent
+    public void heal(LivingHealEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player && event.getAmount() >= 1.0F) {
+            RankTrialService.onRecovery(player);
+        }
+    }
+
     @SubscribeEvent
     public void commands(RegisterCommandsEvent event) {
         SoloLevelingCommands.register(event.getDispatcher());
@@ -50,6 +59,7 @@ public final class CommonEvents {
         PassiveHandler.tick(player);
         QuestHandler.tick(player);
         ShadowHandler.tick(player);
+        com.tre.sololeveling.dungeon.DungeonDiscoveryService.tick(player);
     }
 
     @SubscribeEvent
@@ -152,7 +162,14 @@ public final class CommonEvents {
 
     @SubscribeEvent
     public void hurt(LivingHurtEvent event) {
+        event.setAmount(com.tre.sololeveling.shadow.ShadowTraitService.adjustShadowDamage(
+                event.getSource().getEntity(), event.getEntity(), event.getAmount()));
+        event.setAmount(com.tre.sololeveling.dungeon.DungeonCombatBehavior.adjustIncomingDamage(
+                event.getEntity(), event.getSource().getEntity(), event.getAmount()));
+        com.tre.sololeveling.dungeon.DungeonBoss.onHurt(event.getEntity());
         if (event.getEntity() instanceof ServerPlayer victim && HunterData.isAwakened(victim)) {
+            com.tre.sololeveling.shadow.ShadowTraitService.onOwnerHurt(victim);
+            RankTrialService.onDamageTaken(victim, event.getAmount());
             HunterData.recordCombat(victim);
             AbilityService.onDamaged(victim);
             PassiveHandler.breakStealth(victim);
@@ -170,6 +187,7 @@ public final class CommonEvents {
         }
         if (event.getSource().getEntity() instanceof ServerPlayer attacker
                 && HunterData.isAwakened(attacker)) {
+            RankTrialService.onBossDamage(attacker, event.getEntity(), event.getAmount());
             HunterData.recordCombat(attacker);
             boolean generatedDamage = AbilityEffects.generatedDamage(attacker);
             boolean backstab = !generatedDamage && HunterData.isStealthed(attacker)

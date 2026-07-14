@@ -171,7 +171,9 @@ public final class HunterData {
         tag.putString("job", "None");
         tag.putString("title", "The Player");
         tag.putString("rank_override", "");
-        tag.putInt("rank_override_tier", -1);
+        tag.putInt("rank_override_tier", HunterRank.E.tier());
+        tag.putInt("rank_progress_tier", HunterRank.E.tier());
+        tag.putBoolean("rank_progress_initialized", true);
         tag.putBoolean("hud", true);
         tag.putBoolean("black_heart", false);
         tag.putInt("shadow_capacity_bonus", 0);

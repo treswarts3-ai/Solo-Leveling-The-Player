@@ -166,6 +166,12 @@ public final class QuestManager {
     public static void onSystemOpened(ServerPlayer player) { updateMatching(player, QuestObjectiveType.SYSTEM_OPEN, "system", 1, false); }
     public static void onExercise(ServerPlayer player, String exercise, int amount) { if (amount > 0) updateMatching(player, QuestObjectiveType.EXERCISE, exercise, amount, false); }
     public static void onDistanceMoved(ServerPlayer player, int blocks) { if (blocks > 0) updateMatching(player, QuestObjectiveType.DISTANCE, "sprint", blocks, false); }
+    public static void onEnemyRole(ServerPlayer player, String role) { updateMatching(player, QuestObjectiveType.ENEMY_ROLE, role, 1, false); }
+    public static void onEncounterConstraint(ServerPlayer player, String constraint) { updateMatching(player, QuestObjectiveType.ENCOUNTER_CONSTRAINT, constraint, 1, false); }
+    public static void onSecretDiscovered(ServerPlayer player, String secret) { updateMatching(player, QuestObjectiveType.SECRET_DISCOVERY, secret, 1, false); }
+    public static void onShadowDeveloped(ServerPlayer player, String event) { updateMatching(player, QuestObjectiveType.SHADOW_DEVELOPMENT, event, 1, false); }
+    public static void onEquipmentUpgraded(ServerPlayer player, String rarity) { updateMatching(player, QuestObjectiveType.EQUIPMENT_UPGRADE, rarity, 1, false); }
+    public static void onCombatStyle(ServerPlayer player, String style) { updateMatching(player, QuestObjectiveType.COMBAT_STYLE, style, 1, false); }
 
     private static void updateMatching(ServerPlayer player, QuestObjectiveType type, String eventTarget, int amount, boolean hostile) {
         if (!HunterData.isAwakened(player) || amount <= 0) return;

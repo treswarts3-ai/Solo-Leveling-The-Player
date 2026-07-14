@@ -52,12 +52,21 @@ public final class EquipmentUpgradeMaterialItem extends Item {
             return InteractionResultHolder.fail(catalyst);
         }
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+            int goldCost = definition.upgradeCost(before);
+            if (!serverPlayer.getAbilities().instabuild && com.tre.sololeveling.data.HunterData.getGold(serverPlayer) < goldCost) {
+                serverPlayer.sendSystemMessage(Component.literal("[SYSTEM] Upgrade requires " + goldCost + " gold.")
+                        .withStyle(ChatFormatting.RED));
+                return InteractionResultHolder.fail(catalyst);
+            }
+            if (!serverPlayer.getAbilities().instabuild) com.tre.sololeveling.data.HunterData.setGold(serverPlayer,
+                    com.tre.sololeveling.data.HunterData.getGold(serverPlayer) - goldCost);
             EquipmentData.upgrade(target, definition, upgradeAmount);
             int after = EquipmentData.upgradeLevel(target, definition);
             if (!serverPlayer.getAbilities().instabuild) catalyst.shrink(1);
             level.playSound(null, serverPlayer.blockPosition(), SoundEvents.ENCHANTMENT_TABLE_USE, SoundSource.PLAYERS, 0.9F, 1.15F);
             serverPlayer.sendSystemMessage(Component.translatable("message.sololeveling.upgrade_success",
                     target.getHoverName(), after, definition.maxUpgrade()).withStyle(ChatFormatting.AQUA));
+            com.tre.sololeveling.quest.QuestApi.onEquipmentUpgraded(serverPlayer, definition.rarity().name().toLowerCase(java.util.Locale.ROOT));
         }
         return InteractionResultHolder.sidedSuccess(catalyst, level.isClientSide);
     }

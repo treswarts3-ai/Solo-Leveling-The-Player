@@ -2,6 +2,7 @@ package com.tre.sololeveling.client;
 
 import com.tre.sololeveling.SoloLevelingMod;
 import com.tre.sololeveling.client.screen.SystemScreen;
+import com.tre.sololeveling.client.screen.ShadowCommandWheelScreen;
 import com.tre.sololeveling.client.ui.SystemUi;
 import com.tre.sololeveling.gameplay.ability.AbilityDefinition;
 import com.tre.sololeveling.gameplay.ability.AbilityMastery;
@@ -41,10 +42,9 @@ public final class ClientEvents {
             }
         }
         if (ClientKeyMappings.SHADOWS.consumeClick()) {
-            if (minecraft.screen == null || minecraft.screen instanceof SystemScreen) {
-                SystemUi.Actions.send("OPEN_SYSTEM", 500L);
-                minecraft.setScreen(new SystemScreen(SystemScreen.Tab.SHADOWS));
-            }
+            if (minecraft.screen instanceof ShadowCommandWheelScreen) minecraft.setScreen(null);
+            else if (minecraft.screen == null || minecraft.screen instanceof SystemScreen)
+                minecraft.setScreen(new ShadowCommandWheelScreen());
         }
         if (minecraft.screen == null && minecraft.player.isAlive() && !minecraft.player.isSpectator()) {
             for (ClientKeyMappings.AbilityBinding binding : ClientKeyMappings.ABILITIES) {

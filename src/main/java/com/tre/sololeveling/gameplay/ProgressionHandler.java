@@ -24,7 +24,9 @@ public final class ProgressionHandler {
             HunterData.unlockSkill(player, "advanced_dagger_techniques");
             HunterData.storeSystemItem(player, new ItemStack(ModItems.KNIGHT_KILLER.get()));
             completeStage(player, 2, "job_change", "Dagger Training", 900, 600);
-        } else if (stage == 2 && HunterData.getLevel(player) >= 40 && tag.getInt("job_change_kills") >= 25) {
+        } else if (stage == 2 && HunterData.getLevel(player) >= 60
+                && HunterData.getRankTier(player) >= com.tre.sololeveling.data.HunterRank.S.tier()
+                && tag.getBoolean("job_change_dungeon_cleared") && tag.getInt("job_change_kills") >= 25) {
             tag.putString("job", "Necromancer");
             HunterData.unlockSkill(player, "shadow_extraction");
             HunterData.unlockSkill(player, "shadow_preservation");
@@ -33,6 +35,7 @@ public final class ProgressionHandler {
             tag.putString("job", "Shadow Monarch");
             tag.putString("title", "Monarch of Shadows");
             HunterData.unlockSkill(player, "shadow_exchange");
+            HunterData.setHunterRank(player, com.tre.sololeveling.data.HunterRank.SHADOW_MONARCH.tier());
             completeStage(player, 4, "black_heart_trial", "Shadow Mastery", 5000, 3000);
         } else if (stage == 4 && HunterData.getLevel(player) >= 80 && HunterData.shadows(player).size() >= 10) {
             HunterData.storeSystemItem(player, new ItemStack(ModItems.BLACK_HEART.get()));

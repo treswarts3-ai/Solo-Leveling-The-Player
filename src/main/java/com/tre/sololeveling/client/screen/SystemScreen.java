@@ -297,8 +297,9 @@ public final class SystemScreen extends Screen {
     }
 
     private void addShadowButtons() {
-        String[] labels = {"EXTRACT", "SUMMON", "DISMISS", "EXCHANGE", "DOMAIN", "MODE"};
-        String[] actions = {"EXTRACT", "SUMMON_SHADOW", "DISMISS_SHADOWS", "SHADOW_EXCHANGE", "TOGGLE_DOMAIN", "SHADOW_MODE"};
+        String[] labels = {"EXTRACT", "SUMMON", "DISMISS", "FOLLOW", "GUARD", "ATTACK", "HOLD", "RETURN", "FORMATION"};
+        String[] actions = {"EXTRACT", "SUMMON_SHADOW", "DISMISS_SHADOWS", "SHADOW_FOLLOW", "SHADOW_GUARD",
+                "SHADOW_ATTACK", "SHADOW_HOLD", "SHADOW_RETURN", "SHADOW_FORMATION"};
         int columns = contentWidth >= 360 ? 3 : 2;
         int buttonWidth = (contentWidth - (columns - 1) * 4) / columns;
         int rows = (labels.length + columns - 1) / columns;
@@ -413,6 +414,12 @@ public final class SystemScreen extends Screen {
         setActive("shadow:SHADOW_EXCHANGE", data.skillUnlocked("shadow_exchange") && !data.strings("active_shadows").isEmpty() && data.cooldownRemaining("shadow_exchange") <= 0L);
         setActive("shadow:TOGGLE_DOMAIN", data.skillUnlocked("monarch_domain"));
         setActive("shadow:SHADOW_MODE", !data.compounds("shadows").isEmpty());
+        setActive("shadow:SHADOW_FOLLOW", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_GUARD", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_ATTACK", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_HOLD", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_RETURN", !data.strings("active_shadows").isEmpty());
+        setActive("shadow:SHADOW_FORMATION", !data.strings("active_shadows").isEmpty());
     }
 
     private void setActive(String key, boolean active) {

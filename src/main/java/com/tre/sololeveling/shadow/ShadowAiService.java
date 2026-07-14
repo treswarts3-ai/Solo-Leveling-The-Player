@@ -20,6 +20,7 @@ import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.Comparator;
 import java.util.UUID;
@@ -30,13 +31,25 @@ public final class ShadowAiService {
     private static final String STUCK_Y = "sl_ai_y";
     private static final String STUCK_Z = "sl_ai_z";
     private static final String STUCK_SINCE = "sl_ai_stuck_since";
+    private static final String HOLD_X = "sl_hold_x";
+    private static final String HOLD_Y = "sl_hold_y";
+    private static final String HOLD_Z = "sl_hold_z";
 
     public enum Mode {
-        FOLLOW("Follow"), GUARD("Guard"), PASSIVE("Passive"), AGGRESSIVE("Aggressive");
+        FOLLOW("Follow"), GUARD("Guard"), PASSIVE("Passive"), AGGRESSIVE("Attack"), HOLD_POSITION("Hold Position");
         private final String display;
         Mode(String display) { this.display = display; }
         public String display() { return display; }
         public static Mode of(int value) { return values()[Math.floorMod(value, values().length)]; }
+    }
+
+    public enum Formation {
+        FOLLOW("Follow"), DEFENSIVE_RING("Defensive Ring"), FORWARD_ASSAULT("Forward Assault"),
+        RANGED_REAR_LINE("Ranged Rear Line"), BOSS_FOCUS("Boss Focus");
+        private final String display;
+        Formation(String display) { this.display = display; }
+        public String display() { return display; }
+        public static Formation of(int value) { return values()[Math.floorMod(value, values().length)]; }
     }
 
     public static void tick(ServerPlayer owner) {
@@ -65,6 +78,36 @@ public final class ShadowAiService {
         setMode(owner, HunterData.mutable(owner).getInt("shadow_mode") + 1);
     }
 
+    public static void command(ServerPlayer owner, Mode mode) {
+        setMode(owner, mode.ordinal());
+        if (mode == Mode.HOLD_POSITION) {
+            for (UUID id : ShadowSummoningService.activeIds(owner)) {
+                Entity entity = ShadowSummoningService.findEntity(owner.getServer(), id);
+                if (!(entity instanceof Mob mob) || mob.level() != owner.level()) continue;
+                CompoundTag data = mob.getPersistentData();
+                data.putDouble(HOLD_X, mob.getX()); data.putDouble(HOLD_Y, mob.getY()); data.putDouble(HOLD_Z, mob.getZ());
+                mob.getNavigation().stop();
+            }
+        }
+    }
+
+    public static void returnAll(ServerPlayer owner) {
+        for (UUID id : ShadowSummoningService.activeIds(owner)) {
+            Entity entity = ShadowSummoningService.findEntity(owner.getServer(), id);
+            if (entity instanceof Mob mob && mob.level() == owner.level()) teleportNearOwner(owner, mob);
+        }
+        setMode(owner, Mode.FOLLOW.ordinal());
+    }
+
+    public static void cycleFormation(ServerPlayer owner) {
+        CompoundTag tag = HunterData.mutable(owner);
+        Formation formation = Formation.of(tag.getInt("shadow_formation") + 1);
+        tag.putInt("shadow_formation", formation.ordinal());
+        owner.sendSystemMessage(Component.literal("[SYSTEM] Shadow formation: " + formation.display())
+                .withStyle(ChatFormatting.LIGHT_PURPLE));
+        HunterData.sync(owner);
+    }
+
     private static void control(ServerPlayer owner, Mob shadow, Mode mode) {
         shadow.clearFire();
         shadow.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 40, 0, false, false));
@@ -81,34 +124,57 @@ public final class ShadowAiService {
                         5, 0.25D, 0.35D, 0.25D, 0.02D);
             }
         }
+        if (owner.tickCount % 40 == Math.floorMod(shadow.getId(), 40) && shadow.distanceToSqr(owner) <= 24.0D * 24.0D) {
+            boolean named = !shadow.getPersistentData().getString(ShadowSummoningService.TAG_TRAIT).equals("NONE");
+            owner.serverLevel().sendParticles(named ? ParticleTypes.END_ROD : ParticleTypes.SOUL,
+                    shadow.getX(), shadow.getY() + shadow.getBbHeight() * 0.72D, shadow.getZ(),
+                    named ? 2 : 1, 0.12D, 0.10D, 0.12D, 0.005D);
+        }
 
         LivingEntity current = shadow.getTarget();
         if (!validTarget(owner, current)) shadow.setTarget(null);
-        LivingEntity desired = desiredTarget(owner, shadow, mode);
+        Formation formation = Formation.of(HunterData.mutable(owner).getInt("shadow_formation"));
+        LivingEntity desired = desiredTarget(owner, shadow, mode, formation);
         if (desired != null) shadow.setTarget(desired);
         else if (mode == Mode.PASSIVE || mode == Mode.FOLLOW) shadow.setTarget(null);
 
+        if (mode == Mode.HOLD_POSITION) {
+            CompoundTag data = shadow.getPersistentData();
+            Vec3 hold = new Vec3(data.getDouble(HOLD_X), data.getDouble(HOLD_Y), data.getDouble(HOLD_Z));
+            if (shadow.position().distanceToSqr(hold) > 2.25D && shadow.getTarget() == null) {
+                shadow.getNavigation().moveTo(hold.x, hold.y, hold.z, 1.05D);
+            }
+            return;
+        }
         double distance = shadow.distanceToSqr(owner);
         if (distance > 48.0D * 48.0D || stuck(owner, shadow, distance)) {
             teleportNearOwner(owner, shadow);
         } else if (distance > followDistance(mode) * followDistance(mode)
                 && (shadow.getTarget() == null || mode != Mode.AGGRESSIVE)) {
-            shadow.getNavigation().moveTo(owner, inDomain ? 1.25D : 1.15D);
+            Vec3 destination = formationPoint(owner, shadow, formation);
+            shadow.getNavigation().moveTo(destination.x, destination.y, destination.z, inDomain ? 1.25D : 1.15D);
         }
     }
 
-    private static LivingEntity desiredTarget(ServerPlayer owner, Mob shadow, Mode mode) {
+    private static LivingEntity desiredTarget(ServerPlayer owner, Mob shadow, Mode mode, Formation formation) {
         if (mode == Mode.PASSIVE) return null;
         LivingEntity target = owner.getLastHurtMob();
         if (!validTarget(owner, target)) target = owner.getLastHurtByMob();
         if (validTarget(owner, target)) return target;
-        if (mode != Mode.GUARD && mode != Mode.AGGRESSIVE) return null;
+        if (formation == Formation.BOSS_FOCUS) {
+            LivingEntity boss = owner.serverLevel().getEntitiesOfClass(LivingEntity.class,
+                            shadow.getBoundingBox().inflate(28.0D), candidate -> validTarget(owner, candidate)
+                                    && candidate.getPersistentData().getBoolean("sl_dungeon_boss"))
+                    .stream().min(Comparator.comparingDouble(shadow::distanceToSqr)).orElse(null);
+            if (boss != null) return boss;
+        }
+        if (mode != Mode.GUARD && mode != Mode.AGGRESSIVE && mode != Mode.HOLD_POSITION) return null;
         // Autonomous acquisition is the expensive part of shadow AI. Keep immediate
         // owner combat reactions, but stagger local searches across four update groups
         // and suspend them while a shadow is far enough away to be recovering to owner.
         if (shadow.distanceToSqr(owner) > 32.0D * 32.0D
                 || Math.floorMod(shadow.getId(), 4) != Math.floorMod(owner.tickCount / 5, 4)) return null;
-        double range = mode == Mode.AGGRESSIVE ? 18.0D : 10.0D;
+        double range = mode == Mode.AGGRESSIVE ? 18.0D : mode == Mode.HOLD_POSITION ? 7.0D : 10.0D;
         AABB area = shadow.getBoundingBox().inflate(range);
         return owner.serverLevel().getEntitiesOfClass(LivingEntity.class, area,
                         candidate -> candidate instanceof Enemy && validTarget(owner, candidate))
@@ -178,6 +244,28 @@ public final class ShadowAiService {
     }
 
     private static double followDistance(Mode mode) { return mode == Mode.PASSIVE ? 4.0D : 7.0D; }
+
+    private static Vec3 formationPoint(ServerPlayer owner, Mob shadow, Formation formation) {
+        Vec3 look = owner.getLookAngle();
+        Vec3 forward = new Vec3(look.x, 0.0D, look.z);
+        if (forward.lengthSqr() < 1.0E-6D) forward = new Vec3(0.0D, 0.0D, 1.0D);
+        forward = forward.normalize();
+        Vec3 side = new Vec3(-forward.z, 0.0D, forward.x);
+        double slot = Math.floorMod(shadow.getId(), 8) - 3.5D;
+        return switch (formation) {
+            case FOLLOW -> owner.position().add(side.scale(slot * 0.7D)).subtract(forward.scale(2.5D));
+            case DEFENSIVE_RING -> {
+                double angle = Math.PI * 2.0D * Math.floorMod(shadow.getId(), 12) / 12.0D;
+                yield owner.position().add(Math.cos(angle) * 5.0D, 0.0D, Math.sin(angle) * 5.0D);
+            }
+            case FORWARD_ASSAULT -> owner.position().add(forward.scale(6.0D)).add(side.scale(slot));
+            case RANGED_REAR_LINE -> {
+                boolean ranged = shadow.getPersistentData().getString(ShadowSummoningService.TAG_ROLE).matches("RANGED|CASTER");
+                yield owner.position().add(forward.scale(ranged ? -6.0D : 4.0D)).add(side.scale(slot));
+            }
+            case BOSS_FOCUS -> owner.position().add(side.scale(slot * 0.8D)).subtract(forward.scale(1.5D));
+        };
+    }
 
     private ShadowAiService() {}
 }

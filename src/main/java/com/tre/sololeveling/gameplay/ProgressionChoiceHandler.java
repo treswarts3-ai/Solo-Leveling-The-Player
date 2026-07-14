@@ -32,7 +32,7 @@ public final class ProgressionChoiceHandler {
         boolean changed = ensureRankState(player, tag);
         changed |= queueGrowthChoices(player, tag);
         changed |= queueMilestones(player, tag);
-        changed |= updateRankTrial(player, tag);
+        RankTrialService.tick(player);
         if (changed) HunterData.sync(player);
     }
 
@@ -222,123 +222,20 @@ public final class ProgressionChoiceHandler {
         return changed;
     }
 
-    private static boolean updateRankTrial(ServerPlayer player, CompoundTag tag) {
-        int tier = tag.getInt("rank_progress_tier");
-        boolean eligible = tier == HunterRank.E.tier() && HunterData.getLevel(player) >= D_RANK_LEVEL;
-        boolean changed = false;
-        if (eligible && !tag.getBoolean("rank_trial_eligible_notified")) {
-            tag.putBoolean("rank_trial_eligible_notified", true);
-            player.sendSystemMessage(Component.literal("[SYSTEM] E-to-D Rank Evaluation available. Use the Stats screen or /slrank begin.")
-                    .withStyle(ChatFormatting.AQUA, ChatFormatting.BOLD));
-            changed = true;
-        }
-        if (tag.getBoolean("rank_trial_active") && player.level().getGameTime() >= tag.getLong("rank_trial_end")) {
-            failRankTrial(player, "Time expired");
-            return false;
-        }
-        return changed;
-    }
-
     public static boolean beginRankTrial(ServerPlayer player) {
-        if (!HunterData.isAwakened(player)) return false;
-        CompoundTag tag = HunterData.mutable(player);
-        ensureRankState(player, tag);
-        long now = player.level().getGameTime();
-        if (tag.getBoolean("rank_trial_active")) {
-            player.sendSystemMessage(Component.literal("[SYSTEM] A rank evaluation is already active.").withStyle(ChatFormatting.GRAY));
-            return false;
-        }
-        if (tag.getInt("rank_progress_tier") != HunterRank.E.tier() || HunterData.getLevel(player) < D_RANK_LEVEL) {
-            player.sendSystemMessage(Component.literal("[SYSTEM] E-to-D evaluation requires E-Rank and level " + D_RANK_LEVEL + ".")
-                    .withStyle(ChatFormatting.RED));
-            return false;
-        }
-        if (now < tag.getLong("rank_trial_retry_after")) {
-            long seconds = Math.max(1L, (tag.getLong("rank_trial_retry_after") - now + 19L) / 20L);
-            player.sendSystemMessage(Component.literal("[SYSTEM] Evaluation retry available in " + seconds + "s.").withStyle(ChatFormatting.RED));
-            return false;
-        }
-
-        tag.putBoolean("rank_trial_active", true);
-        tag.putInt("rank_trial_kills", 0);
-        tag.putInt("rank_trial_target", D_RANK_KILLS);
-        tag.putLong("rank_trial_end", now + RANK_TRIAL_DURATION_TICKS);
-        tag.putInt("rank_trial_attempts", tag.getInt("rank_trial_attempts") + 1);
-        HunterData.sync(player);
-        player.sendSystemMessage(Component.literal("[RANK EVALUATION] Defeat " + D_RANK_KILLS
-                + " hostile enemies within 5 minutes without dying.").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-        player.level().playSound(null, player.blockPosition(), SoundEvents.RAID_HORN.value(), SoundSource.PLAYERS, 0.7F, 1.2F);
-        return true;
+        return RankTrialService.begin(player);
     }
 
     public static void onRankTrialKill(ServerPlayer player, LivingEntity victim) {
-        CompoundTag tag = HunterData.mutable(player);
-        if (!tag.getBoolean("rank_trial_active") || !(victim instanceof Enemy)) return;
-        if (victim.getPersistentData().getBoolean("sl_shadow") || victim.getPersistentData().getBoolean("sl_penalty_mob")) return;
-        if (victim.getPersistentData().getBoolean("sl_rank_trial_counted")) return;
-        victim.getPersistentData().putBoolean("sl_rank_trial_counted", true);
-
-        int target = Math.max(1, tag.getInt("rank_trial_target"));
-        int kills = Math.min(target, tag.getInt("rank_trial_kills") + 1);
-        tag.putInt("rank_trial_kills", kills);
-        if (kills >= target) completeRankTrial(player);
-        else {
-            player.displayClientMessage(Component.literal("[RANK EVALUATION] " + kills + " / " + target)
-                    .withStyle(ChatFormatting.AQUA), true);
-            HunterData.sync(player);
-        }
+        RankTrialService.onKill(player, victim);
     }
 
     public static void onPlayerDeath(ServerPlayer player) {
-        if (HunterData.mutable(player).getBoolean("rank_trial_active")) failRankTrial(player, "Hunter defeated");
-    }
-
-    private static void completeRankTrial(ServerPlayer player) {
-        CompoundTag tag = HunterData.mutable(player);
-        if (!tag.getBoolean("rank_trial_active")) return;
-        tag.putBoolean("rank_trial_active", false);
-        tag.putInt("rank_trial_kills", tag.getInt("rank_trial_target"));
-        tag.putLong("rank_trial_end", 0L);
-        tag.putInt("rank_progress_tier", HunterRank.D.tier());
-        tag.putInt("rank_override_tier", HunterRank.D.tier());
-        tag.putString("rank_override", HunterRank.D.displayName());
-
-        if (!tag.getBoolean("rank_reward_d_granted")) {
-            tag.putBoolean("rank_reward_d_granted", true);
-            HunterData.addStatPoints(player, 5);
-            HunterData.addGold(player, 1000);
-            HunterData.addXp(player, 750);
-        }
-
-        HunterData.sync(player);
-        player.sendSystemMessage(Component.literal("[RANK UP] Evaluation passed. Hunter rank advanced to D-Rank.")
-                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-        player.level().playSound(null, player.blockPosition(), SoundEvents.UI_TOAST_CHALLENGE_COMPLETE, SoundSource.PLAYERS, 1.0F, 0.9F);
-    }
-
-    private static void failRankTrial(ServerPlayer player, String reason) {
-        CompoundTag tag = HunterData.mutable(player);
-        if (!tag.getBoolean("rank_trial_active")) return;
-        tag.putBoolean("rank_trial_active", false);
-        tag.putLong("rank_trial_end", 0L);
-        tag.putLong("rank_trial_retry_after", player.level().getGameTime() + 20L * 60L);
-        HunterData.sync(player);
-        player.sendSystemMessage(Component.literal("[RANK EVALUATION FAILED] " + reason + ". Retry available in 60 seconds.")
-                .withStyle(ChatFormatting.RED, ChatFormatting.BOLD));
+        RankTrialService.onDeath(player);
     }
 
     public static String rankStatus(ServerPlayer player) {
-        CompoundTag tag = HunterData.mutable(player);
-        ensureRankState(player, tag);
-        if (tag.getBoolean("rank_trial_active")) {
-            long seconds = Math.max(0L, (tag.getLong("rank_trial_end") - player.level().getGameTime() + 19L) / 20L);
-            return "E-to-D evaluation active: " + tag.getInt("rank_trial_kills") + " / "
-                    + Math.max(1, tag.getInt("rank_trial_target")) + " kills, " + seconds + "s remaining";
-        }
-        if (tag.getInt("rank_progress_tier") == HunterRank.E.tier() && HunterData.getLevel(player) >= D_RANK_LEVEL) {
-            return "E-to-D evaluation available";
-        }
-        return "Current rank: " + HunterRank.byTier(tag.getInt("rank_progress_tier")).displayName();
+        return RankTrialService.status(player);
     }
 
     public static void reset(ServerPlayer player) {
@@ -361,12 +258,7 @@ public final class ProgressionChoiceHandler {
     }
 
     public static void resetRankTrial(ServerPlayer player) {
-        CompoundTag tag = HunterData.mutable(player);
-        tag.putBoolean("rank_trial_active", false);
-        tag.putInt("rank_trial_kills", 0);
-        tag.putLong("rank_trial_end", 0L);
-        tag.putLong("rank_trial_retry_after", 0L);
-        HunterData.sync(player);
+        RankTrialService.reset(player);
     }
 
     private static String normalize(String value) {

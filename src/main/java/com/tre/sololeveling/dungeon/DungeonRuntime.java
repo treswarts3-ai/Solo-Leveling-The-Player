@@ -97,7 +97,8 @@ public final class DungeonRuntime {
             if (findSession(server, member.getUUID()) != null) {
                 return Result.fail(member.getScoreboardName() + " already owns or belongs to a dungeon session");
             }
-            if (HunterData.getLevel(member) < gate.minimumLevel()) {
+            if (HunterData.getLevel(member) < gate.minimumLevel()
+                    && !com.tre.sololeveling.gameplay.RankTrialService.permitsEvaluationEntry(member)) {
                 return Result.fail(member.getScoreboardName() + " requires level " + gate.minimumLevel());
             }
             String denial = DungeonHooks.evaluateAccess(member, gate, template);
@@ -482,6 +483,11 @@ public final class DungeonRuntime {
         else if (enemy.getKillCredit() instanceof ServerPlayer lastPlayer && session.contains(lastPlayer.getUUID())) credited = lastPlayer;
         DungeonHooks.post(new DungeonHooks.EnemyDefeatedEvent(session, credited, enemy,
                 DungeonEnemies.enemyId(enemy), DungeonEnemies.shadowExtractable(enemy)));
+        if (credited != null) {
+            DungeonTypes.EnemyDefinition defeated = DungeonContent.enemy(DungeonEnemies.enemyId(enemy));
+            if (defeated != null) com.tre.sololeveling.quest.QuestApi.onEnemyRole(credited,
+                    defeated.kind().name().toLowerCase(java.util.Locale.ROOT));
+        }
         if (objective != null && objective.type() == DungeonTypes.ObjectiveType.COLLECTION) {
             DungeonEnemies.dropCollectionToken(level, enemy);
         }
@@ -512,6 +518,10 @@ public final class DungeonRuntime {
         int completedIndex = session.objectiveIndex();
         log(session, "Objective completed", "objective=" + objective.id() + ", index=" + completedIndex);
         DungeonHooks.post(new DungeonHooks.ObjectiveCompletedEvent(session, objective.id()));
+        for (UUID memberId : session.members()) {
+            ServerPlayer member = server.getPlayerList().getPlayer(memberId);
+            if (member != null) com.tre.sololeveling.gameplay.RankTrialService.onDungeonObjective(member);
+        }
         broadcast(server, session, "[OBJECTIVE COMPLETE] " + objective.displayName(), ChatFormatting.GREEN);
         if (objective.type() == DungeonTypes.ObjectiveType.REWARD) {
             complete(server, session);
@@ -598,6 +608,7 @@ public final class DungeonRuntime {
                 }
             }
         }
+        com.tre.sololeveling.equipment.DungeonLootService.grantMasterDungeonRoll(player);
         HunterData.sync(player);
         try {
             DungeonHooks.grantIntegrationRewards(player, session, template);
