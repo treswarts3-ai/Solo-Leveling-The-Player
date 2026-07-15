@@ -47,6 +47,8 @@ for action in ("SUMMON_SHADOW", "DISMISS_SHADOWS", "SHADOW_FOLLOW", "SHADOW_GUAR
                "SHADOW_HOLD", "SHADOW_RETURN", "SHADOW_FORMATION"):
     assert action in wheel, f"wheel action missing: {action}"
 assert "MAX_STORED = 128" in storage and "ACTIVE_SHADOW_MAX" in read("src/main/java/com/tre/sololeveling/shadow/ShadowSummoningService.java")
+summoning = read("src/main/java/com/tre/sololeveling/shadow/ShadowSummoningService.java")
+assert "entity != null && entity.getPersistentData()" in summoning, "null damage-source shadow guard missing"
 assert "PHASES_6_8" in "PHASES_6_8.md"
 
 print("Phase 6–8 enemy, progression, loot, quest, and shadow contracts validated.")
