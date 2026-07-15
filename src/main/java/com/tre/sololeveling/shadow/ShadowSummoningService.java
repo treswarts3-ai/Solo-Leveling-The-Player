@@ -181,12 +181,17 @@ public final class ShadowSummoningService {
         return ids;
     }
 
-    public static boolean isShadow(Entity entity) { return entity.getPersistentData().getBoolean(TAG_SHADOW); }
+    /** Damage sources such as fire, falling, magic, and the environment have no attacking entity. */
+    public static boolean isShadow(Entity entity) {
+        return entity != null && entity.getPersistentData().getBoolean(TAG_SHADOW);
+    }
     public static UUID ownerId(Entity entity) {
+        if (entity == null) return null;
         CompoundTag tag = entity.getPersistentData();
         return isShadow(entity) && tag.hasUUID(TAG_OWNER) ? tag.getUUID(TAG_OWNER) : null;
     }
     public static UUID recordId(Entity entity) {
+        if (entity == null) return null;
         CompoundTag tag = entity.getPersistentData();
         return isShadow(entity) && tag.hasUUID(TAG_RECORD) ? tag.getUUID(TAG_RECORD) : null;
     }
